@@ -1,0 +1,15 @@
+spirv-tools (2019.1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * watch: Updated.
+  * fix_pkconfig_pc_file.patch: Dropped, upstream.
+  * source: Switch to format 3.0 (quilt).
+  * control: Bump build-dep on spirv-headers.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Sun, 13 Jan 2019 18:46:22 +0200
+
+spirv-tools (2018.2-1) unstable; urgency=medium
+
+  * Initial release (Closes: #890553)
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Sun, 10 Jun 2018 10:46:15 +0300

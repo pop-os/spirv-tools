@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ 
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DSPIRV-Headers_SOURCE_DIR=/usr
+
+override_dh_auto_test:
+
+gentarball: SOURCE=spirv-tools
+gentarball: UV=$(shell dpkg-parsechangelog|awk '/^Version:/ {print $$2}'|sed 's/-.*$$//')
+gentarball:
+	git archive --format=tar upstream-unstable --prefix=$(SOURCE)-$(UV)/ | gzip -9 > \
+		../$(SOURCE)_$(UV).orig.tar.gz
+

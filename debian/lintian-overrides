@@ -1,0 +1,4 @@
+package-name-doesnt-match-sonames libSPIRV-Tools-shared
+shlib-without-versioned-soname usr/lib/x86_64-linux-gnu/libSPIRV-Tools-shared.so libSPIRV-Tools-shared.so
+package-must-activate-ldconfig-trigger usr/lib/x86_64-linux-gnu/libSPIRV-Tools-shared.so
+
