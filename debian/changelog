@@ -1,3 +1,9 @@
+spirv-tools (2019.1-2) unstable; urgency=medium
+
+  * copyright: Updated. (Closes: #919687)
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 23 Jan 2019 14:20:46 +0200
+
 spirv-tools (2019.1-1) unstable; urgency=medium
 
   * New upstream release.
