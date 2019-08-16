@@ -13,7 +13,6 @@ SPVTOOLS_SRC_FILES := \
 		source/ext_inst.cpp \
 		source/enum_string_mapping.cpp \
 		source/extensions.cpp \
-		source/id_descriptor.cpp \
 		source/libspirv.cpp \
 		source/name_mapper.cpp \
 		source/opcode.cpp \
@@ -63,6 +62,7 @@ SPVTOOLS_SRC_FILES := \
 		source/val/validate_instruction.cpp \
 		source/val/validate_memory.cpp \
 		source/val/validate_memory_semantics.cpp \
+		source/val/validate_misc.cpp \
 		source/val/validate_mode_setting.cpp \
 		source/val/validate_layout.cpp \
 		source/val/validate_literals.cpp \
@@ -70,6 +70,7 @@ SPVTOOLS_SRC_FILES := \
 		source/val/validate_non_uniform.cpp \
 		source/val/validate_primitives.cpp \
 		source/val/validate_scopes.cpp \
+		source/val/validate_small_type_uses.cpp \
 		source/val/validate_type.cpp
 
 SPVTOOLS_OPT_SRC_FILES := \
@@ -83,7 +84,6 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/ccp_pass.cpp \
 		source/opt/code_sink.cpp \
 		source/opt/combine_access_chains.cpp \
-		source/opt/common_uniform_elim_pass.cpp \
 		source/opt/compact_ids_pass.cpp \
 		source/opt/composite.cpp \
 		source/opt/const_folding_rules.cpp \
@@ -92,8 +92,10 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/dead_branch_elim_pass.cpp \
 		source/opt/dead_insert_elim_pass.cpp \
 		source/opt/dead_variable_elimination.cpp \
+		source/opt/decompose_initialized_variables_pass.cpp \
 		source/opt/decoration_manager.cpp \
 		source/opt/def_use_manager.cpp \
+		source/opt/desc_sroa.cpp \
 		source/opt/dominator_analysis.cpp \
 		source/opt/dominator_tree.cpp \
 		source/opt/eliminate_dead_constant_pass.cpp \
@@ -101,12 +103,15 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/eliminate_dead_functions_util.cpp \
 		source/opt/eliminate_dead_members_pass.cpp \
 		source/opt/feature_manager.cpp \
+		source/opt/fix_storage_class.cpp \
 		source/opt/flatten_decoration_pass.cpp \
 		source/opt/fold.cpp \
 		source/opt/folding_rules.cpp \
 		source/opt/fold_spec_constant_op_and_composite_pass.cpp \
 		source/opt/freeze_spec_constant_value_pass.cpp \
 		source/opt/function.cpp \
+		source/opt/generate_webgpu_initializers_pass.cpp \
+		source/opt/graphics_robust_access_pass.cpp \
 		source/opt/if_conversion.cpp \
 		source/opt/inline_pass.cpp \
 		source/opt/inline_exhaustive_pass.cpp \
@@ -117,6 +122,7 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/instrument_pass.cpp \
 		source/opt/ir_context.cpp \
 		source/opt/ir_loader.cpp \
+                source/opt/legalize_vector_shuffle_pass.cpp \
 		source/opt/licm_pass.cpp \
 		source/opt/local_access_chain_convert_pass.cpp \
 		source/opt/local_redundancy_elimination.cpp \
@@ -152,8 +158,10 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/scalar_replacement_pass.cpp \
 		source/opt/set_spec_constant_default_value_pass.cpp \
 		source/opt/simplification_pass.cpp \
+		source/opt/split_invalid_unreachable_pass.cpp \
 		source/opt/ssa_rewrite_pass.cpp \
 		source/opt/strength_reduction_pass.cpp \
+		source/opt/strip_atomic_counter_memory_pass.cpp \
 		source/opt/strip_debug_info_pass.cpp \
 		source/opt/strip_reflect_info_pass.cpp \
 		source/opt/struct_cfg_analysis.cpp \

@@ -314,7 +314,7 @@ TEST_F(ValidateIdWithMessage, OpDecorationGroupBad) {
   EXPECT_THAT(getDiagnosticString(),
               HasSubstr("Result id of OpDecorationGroup can only "
                         "be targeted by OpName, OpGroupDecorate, "
-                        "OpDecorate, and OpGroupMemberDecorate"));
+                        "OpDecorate, OpDecorateId, and OpGroupMemberDecorate"));
 }
 TEST_F(ValidateIdWithMessage, OpGroupDecorateDecorationGroupBad) {
   std::string spirv = R"(
@@ -935,6 +935,26 @@ TEST_F(ValidateIdWithMessage, OpTypeStructMemberTypeBad) {
   EXPECT_THAT(getDiagnosticString(),
               HasSubstr("OpTypeStruct Member Type <id> '3[%double_0]' is not "
                         "a type."));
+}
+
+TEST_F(ValidateIdWithMessage, OpTypeStructOpaqueTypeBad) {
+  std::string spirv = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main"
+          %1 = OpTypeSampler
+          %2 = OpTypeStruct %1
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+)";
+  CompileSuccessfully(spirv.c_str(), SPV_ENV_VULKAN_1_0);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_VULKAN_1_0));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpTypeStruct must not contain an opaque type"));
 }
 
 TEST_F(ValidateIdWithMessage, OpTypePointerGood) {
@@ -2170,6 +2190,47 @@ OpMemoryModel Logical GLSL450
 %var = OpVariable %_ptr_function_ptr Function
 OpReturn
 OpFunctionEnd
+)";
+
+  auto options = getValidatorOptions();
+  options->relax_logical_pointer = true;
+  CompileSuccessfully(spirv);
+  EXPECT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateIdWithMessage, OpFunctionWithNonMemoryObject) {
+  // DXC generates code that looks like when given something like:
+  //   T t;
+  //   t.s.fn_1();
+  // This needs to be accepted before legalization takes place, so we
+  // will include it with the relaxed logical pointer.
+
+  const std::string spirv = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %1 "main"
+               OpSource HLSL 600
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+       %void = OpTypeVoid
+          %9 = OpTypeFunction %void
+  %_struct_5 = OpTypeStruct
+  %_struct_6 = OpTypeStruct %_struct_5
+%_ptr_Function__struct_6 = OpTypePointer Function %_struct_6
+%_ptr_Function__struct_5 = OpTypePointer Function %_struct_5
+         %23 = OpTypeFunction %void %_ptr_Function__struct_5
+          %1 = OpFunction %void None %9
+         %10 = OpLabel
+         %11 = OpVariable %_ptr_Function__struct_6 Function
+         %20 = OpAccessChain %_ptr_Function__struct_5 %11 %int_0
+         %21 = OpFunctionCall %void %12 %20
+               OpReturn
+               OpFunctionEnd
+         %12 = OpFunction %void None %23
+         %13 = OpFunctionParameter %_ptr_Function__struct_5
+         %14 = OpLabel
+               OpReturn
+               OpFunctionEnd
 )";
 
   auto options = getValidatorOptions();
@@ -6162,20 +6223,22 @@ TEST_F(ValidateIdWithMessage, IdDefInUnreachableBlock1) {
 %4 = OpTypeFunction %3
 %5 = OpFunction %1 None %2
 %6 = OpLabel
-%7 = OpFunctionCall %3 %8
+OpReturn
+%7 = OpLabel
+%8 = OpFunctionCall %3 %9
 OpUnreachable
 OpFunctionEnd
-%8 = OpFunction %3 None %4
-%9 = OpLabel
-OpReturnValue %7
+%9 = OpFunction %3 None %4
+%10 = OpLabel
+OpReturnValue %8
 OpFunctionEnd
 )";
 
   CompileSuccessfully(spirv, SPV_ENV_UNIVERSAL_1_3);
   EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions(SPV_ENV_UNIVERSAL_1_3));
   EXPECT_THAT(getDiagnosticString(),
-              HasSubstr("ID 7[%7] defined in block 6[%6] does not dominate its "
-                        "use in block 9[%9]\n  %9 = OpLabel"));
+              HasSubstr("ID 8[%8] defined in block 7[%7] does not dominate its "
+                        "use in block 10[%10]\n  %10 = OpLabel"));
 }
 
 TEST_F(ValidateIdWithMessage, IdDefInUnreachableBlock2) {

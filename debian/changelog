@@ -1,3 +1,10 @@
+spirv-tools (2019.4-1) unstable; urgency=medium
+
+  * New upstream release.
+  * control: Bump build-dep on spirv-headers.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Fri, 16 Aug 2019 13:44:21 +0300
+
 spirv-tools (2019.2-1) unstable; urgency=medium
 
   * New upstream release.
