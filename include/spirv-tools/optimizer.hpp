@@ -68,6 +68,11 @@ class Optimizer {
   // The constructed instance will have an empty message consumer, which just
   // ignores all messages from the library. Use SetMessageConsumer() to supply
   // one if messages are of concern.
+  //
+  // For collections of passes that are meant to transform the input into
+  // another execution environment, then the source environment should be
+  // supplied. e.g. for VulkanToWebGPUPasses the environment should be
+  // SPV_ENV_VULKAN_1_1 not SPV_ENV_WEBGPU_0.
   explicit Optimizer(spv_target_env env);
 
   // Disables copy/move constructor/assignment operations.
@@ -674,6 +679,22 @@ Optimizer::PassToken CreateLoopUnrollPass(bool fully_unroll, int factor = 0);
 // processed (see IsSSATargetVar for details).
 Optimizer::PassToken CreateSSARewritePass();
 
+// Create pass to convert relaxed precision instructions to half precision.
+// This pass converts as many relaxed float32 arithmetic operations to half as
+// possible. It converts any float32 operands to half if needed. It converts
+// any resulting half precision values back to float32 as needed. No variables
+// are changed. No image operations are changed.
+//
+// Best if run late since it will generate better code with unneeded function
+// scope loads and stores and composite inserts and extracts removed. Also best
+// if followed by instruction simplification, redundancy elimination and DCE.
+Optimizer::PassToken CreateConvertRelaxedToHalfPass();
+
+// Create relax float ops pass.
+// This pass decorates all float32 result instructions with RelaxedPrecision
+// if not already so decorated.
+Optimizer::PassToken CreateRelaxFloatOpsPass();
+
 // Create copy propagate arrays pass.
 // This pass looks to copy propagate memory references for arrays.  It looks
 // for specific code patterns to recognize array copies.
@@ -728,6 +749,30 @@ Optimizer::PassToken CreateCombineAccessChainsPass();
 Optimizer::PassToken CreateInstBindlessCheckPass(
     uint32_t desc_set, uint32_t shader_id, bool input_length_enable = false,
     bool input_init_enable = false, uint32_t version = 1);
+
+// Create a pass to instrument physical buffer address checking
+// This pass instruments all physical buffer address references to check that
+// all referenced bytes fall in a valid buffer. If the reference is
+// invalid, a record is written to the debug output buffer (if space allows)
+// and a null value is returned. This pass is designed to support buffer
+// address validation in the Vulkan validation layers.
+//
+// Dead code elimination should be run after this pass as the original,
+// potentially invalid code is not removed and could cause undefined behavior,
+// including crashes. Instruction simplification would likely also be
+// beneficial. It is also generally recommended that this pass (and all
+// instrumentation passes) be run after any legalization and optimization
+// passes. This will give better analysis for the instrumentation and avoid
+// potentially de-optimizing the instrument code, for example, inlining
+// the debug record output function throughout the module.
+//
+// The instrumentation will read and write buffers in debug
+// descriptor set |desc_set|. It will write |shader_id| in each output record
+// to identify the shader module which generated the record.
+// |version| specifies the output buffer record format.
+Optimizer::PassToken CreateInstBuffAddrCheckPass(uint32_t desc_set,
+                                                 uint32_t shader_id,
+                                                 uint32_t version = 2);
 
 // Create a pass to upgrade to the VulkanKHR memory model.
 // This pass upgrades the Logical GLSL450 memory model to Logical VulkanKHR.
@@ -794,6 +839,15 @@ Optimizer::PassToken CreateGraphicsRobustAccessPass();
 // accesses to |desc| must be OpAccessChain instructions with a literal index
 // for the first index.
 Optimizer::PassToken CreateDescriptorScalarReplacementPass();
+
+// Create a pass to replace all OpKill instruction with a function call to a
+// function that has a single OpKill.  This allows more code to be inlined.
+Optimizer::PassToken CreateWrapOpKillPass();
+
+// Replaces the extensions VK_AMD_shader_ballot,VK_AMD_gcn_shader, and
+// VK_AMD_shader_trinary_minmax with equivalent code using core instructions and
+// capabilities.
+Optimizer::PassToken CreateAmdExtToKhrPass();
 
 }  // namespace spvtools
 
