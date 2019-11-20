@@ -6,7 +6,8 @@
 override_dh_auto_configure:
 	dh_auto_configure -- \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DSPIRV-Headers_SOURCE_DIR=/usr
+		-DSPIRV-Headers_SOURCE_DIR=/usr \
+		-DBUILD_SHARED_LIBS=ON
 
 override_dh_auto_test:
 

@@ -1,3 +1,10 @@
+spirv-tools (2019.4+git20191022-2) unstable; urgency=medium
+
+  * fix-cmake-install.patch: Install cmake files in the correct path.
+  * rules: Build shared libs.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 20 Nov 2019 13:28:31 +0200
+
 spirv-tools (2019.4+git20191022-1) unstable; urgency=medium
 
   * Sync with upstream/stable 02910ffdffaa.
