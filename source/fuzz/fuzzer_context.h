@@ -71,6 +71,9 @@ class FuzzerContext {
   uint32_t GetChanceOfAdjustingLoopControl() {
     return chance_of_adjusting_loop_control_;
   }
+  uint32_t GetChanceOfAdjustingMemoryOperandsMask() {
+    return chance_of_adjusting_memory_operands_mask_;
+  }
   uint32_t GetChanceOfAdjustingSelectionControl() {
     return chance_of_adjusting_selection_control_;
   }
@@ -81,6 +84,9 @@ class FuzzerContext {
   uint32_t GetChanceOfMovingBlockDown() { return chance_of_moving_block_down_; }
   uint32_t GetChanceOfObfuscatingConstant() {
     return chance_of_obfuscating_constant_;
+  }
+  uint32_t GetChanceOfOutliningFunction() {
+    return chance_of_outlining_function_;
   }
   uint32_t GetChanceOfReplacingIdWithSynonym() {
     return chance_of_replacing_id_with_synonym_;
@@ -112,11 +118,13 @@ class FuzzerContext {
   uint32_t chance_of_adding_no_contraction_decoration_;
   uint32_t chance_of_adjusting_function_control_;
   uint32_t chance_of_adjusting_loop_control_;
+  uint32_t chance_of_adjusting_memory_operands_mask_;
   uint32_t chance_of_adjusting_selection_control_;
   uint32_t chance_of_constructing_composite_;
   uint32_t chance_of_copying_object_;
   uint32_t chance_of_moving_block_down_;
   uint32_t chance_of_obfuscating_constant_;
+  uint32_t chance_of_outlining_function_;
   uint32_t chance_of_replacing_id_with_synonym_;
   uint32_t chance_of_splitting_block_;
 

@@ -1,3 +1,10 @@
+spirv-tools (2019.5-1) unstable; urgency=medium
+
+  * New upstream release.
+  * fix-cmake-install.patch: Dropped, upstream.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 22 Jan 2020 14:18:12 +0200
+
 spirv-tools (2019.4+git20191022-2) unstable; urgency=medium
 
   * fix-cmake-install.patch: Install cmake files in the correct path.
