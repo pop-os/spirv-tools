@@ -1,3 +1,12 @@
+spirv-tools (2020.1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * control: Use debhelper-compat, bump to 12.
+  * control: Don't build on big-endian, before upstream bug 149 is fixed.
+  * control: Bump policy to 4.5, no changes.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 12 Feb 2020 00:06:05 +0200
+
 spirv-tools (2019.5-1) unstable; urgency=medium
 
   * New upstream release.
