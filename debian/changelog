@@ -1,3 +1,10 @@
+spirv-tools (2020.2-1) unstable; urgency=medium
+
+  * New upstream release. (LP: #1871754)
+  * control: Bump spirv-headers build-dependency.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Thu, 09 Apr 2020 14:24:11 +0300
+
 spirv-tools (2020.1-2) unstable; urgency=medium
 
   * control: Build on all archs again, the dependency chain goes too
