@@ -1,3 +1,10 @@
+spirv-tools (2020.3-1) unstable; urgency=medium
+
+  * New upstream release.
+  * rules: Disable shared libs. (Closes: #956510)
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Mon, 01 Jun 2020 11:45:39 +0300
+
 spirv-tools (2020.2-1) unstable; urgency=medium
 
   * New upstream release. (LP: #1871754)
