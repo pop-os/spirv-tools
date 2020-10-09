@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "source/fuzz/fuzzer_pass_add_dead_breaks.h"
+
 #include "source/fuzz/fuzzer_util.h"
 #include "source/fuzz/transformation_add_dead_break.h"
 #include "source/opt/ir_context.h"
@@ -77,7 +78,7 @@ void FuzzerPassAddDeadBreaks::Apply() {
         // Make sure the module has a required boolean constant to be used in
         // OpBranchConditional instruction.
         auto break_condition = GetFuzzerContext()->ChooseEven();
-        FindOrCreateBoolConstant(break_condition);
+        FindOrCreateBoolConstant(break_condition, false);
 
         auto candidate_transformation = TransformationAddDeadBreak(
             block.id(), merge_block->id(), break_condition, std::move(phi_ids));

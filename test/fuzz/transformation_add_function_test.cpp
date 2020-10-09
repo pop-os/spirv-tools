@@ -144,7 +144,7 @@ TEST(TransformationAddFunctionTest, BasicTest) {
   const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
@@ -493,7 +493,7 @@ TEST(TransformationAddFunctionTest, InapplicableTransformations) {
   const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
@@ -631,17 +631,17 @@ TEST(TransformationAddFunctionTest, LoopLimiters) {
   instructions.push_back(MakeInstructionMessage(SpvOpReturn, 0, 0, {}));
   instructions.push_back(MakeInstructionMessage(SpvOpFunctionEnd, 0, 0, {}));
 
-  FactManager fact_manager1;
-  FactManager fact_manager2;
+  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context1.get()));
+
+  FactManager fact_manager1(context1.get());
+  FactManager fact_manager2(context2.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context1(&fact_manager1,
                                                 validator_options);
   TransformationContext transformation_context2(&fact_manager2,
                                                 validator_options);
-
-  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context1.get()));
 
   TransformationAddFunction add_dead_function(instructions);
   ASSERT_TRUE(
@@ -853,17 +853,17 @@ TEST(TransformationAddFunctionTest, KillAndUnreachableInVoidFunction) {
   instructions.push_back(MakeInstructionMessage(SpvOpKill, 0, 0, {}));
   instructions.push_back(MakeInstructionMessage(SpvOpFunctionEnd, 0, 0, {}));
 
-  FactManager fact_manager1;
-  FactManager fact_manager2;
+  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context1.get()));
+
+  FactManager fact_manager1(context1.get());
+  FactManager fact_manager2(context2.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context1(&fact_manager1,
                                                 validator_options);
   TransformationContext transformation_context2(&fact_manager2,
                                                 validator_options);
-
-  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context1.get()));
 
   TransformationAddFunction add_dead_function(instructions);
   ASSERT_TRUE(
@@ -1008,17 +1008,17 @@ TEST(TransformationAddFunctionTest, KillAndUnreachableInNonVoidFunction) {
   instructions.push_back(MakeInstructionMessage(SpvOpKill, 0, 0, {}));
   instructions.push_back(MakeInstructionMessage(SpvOpFunctionEnd, 0, 0, {}));
 
-  FactManager fact_manager1;
-  FactManager fact_manager2;
+  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context1.get()));
+
+  FactManager fact_manager1(context1.get());
+  FactManager fact_manager2(context2.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context1(&fact_manager1,
                                                 validator_options);
   TransformationContext transformation_context2(&fact_manager2,
                                                 validator_options);
-
-  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context1.get()));
 
   TransformationAddFunction add_dead_function(instructions);
   ASSERT_TRUE(
@@ -1295,17 +1295,17 @@ TEST(TransformationAddFunctionTest, ClampedAccessChains) {
   instructions.push_back(MakeInstructionMessage(SpvOpReturn, 0, 0, {}));
   instructions.push_back(MakeInstructionMessage(SpvOpFunctionEnd, 0, 0, {}));
 
-  FactManager fact_manager1;
-  FactManager fact_manager2;
+  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context1.get()));
+
+  FactManager fact_manager1(context1.get());
+  FactManager fact_manager2(context2.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context1(&fact_manager1,
                                                 validator_options);
   TransformationContext transformation_context2(&fact_manager2,
                                                 validator_options);
-
-  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context1.get()));
 
   TransformationAddFunction add_dead_function(instructions);
   ASSERT_TRUE(
@@ -1622,8 +1622,12 @@ TEST(TransformationAddFunctionTest, LivesafeCanCallLivesafe) {
   instructions.push_back(MakeInstructionMessage(SpvOpReturn, 0, 0, {}));
   instructions.push_back(MakeInstructionMessage(SpvOpFunctionEnd, 0, 0, {}));
 
-  FactManager fact_manager1;
-  FactManager fact_manager2;
+  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context1.get()));
+
+  FactManager fact_manager1(context1.get());
+  FactManager fact_manager2(context2.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context1(&fact_manager1,
                                                 validator_options);
@@ -1632,10 +1636,6 @@ TEST(TransformationAddFunctionTest, LivesafeCanCallLivesafe) {
 
   // Mark function 6 as livesafe.
   transformation_context2.GetFactManager()->AddFactFunctionIsLivesafe(6);
-
-  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context1.get()));
 
   TransformationAddFunction add_dead_function(instructions);
   ASSERT_TRUE(
@@ -1722,17 +1722,17 @@ TEST(TransformationAddFunctionTest, LivesafeOnlyCallsLivesafe) {
   instructions.push_back(MakeInstructionMessage(SpvOpReturn, 0, 0, {}));
   instructions.push_back(MakeInstructionMessage(SpvOpFunctionEnd, 0, 0, {}));
 
-  FactManager fact_manager1;
-  FactManager fact_manager2;
+  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context1.get()));
+
+  FactManager fact_manager1(context1.get());
+  FactManager fact_manager2(context2.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context1(&fact_manager1,
                                                 validator_options);
   TransformationContext transformation_context2(&fact_manager2,
                                                 validator_options);
-
-  const auto context1 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  const auto context2 = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context1.get()));
 
   TransformationAddFunction add_dead_function(instructions);
   ASSERT_TRUE(
@@ -1853,14 +1853,13 @@ TEST(TransformationAddFunctionTest,
   )";
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %6 in
   // |donor|.
@@ -2011,14 +2010,13 @@ TEST(TransformationAddFunctionTest,
   )";
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %6 in
   // |donor|.
@@ -2167,14 +2165,13 @@ TEST(TransformationAddFunctionTest, LoopLimitersHeaderIsBackEdgeBlock) {
   )";
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %6 in
   // |donor|.
@@ -2246,7 +2243,7 @@ TEST(TransformationAddFunctionTest, LoopLimitersHeaderIsBackEdgeBlock) {
   ASSERT_TRUE(IsEqual(env, expected, context.get()));
 }
 
-TEST(TransformationAddFunctionTest, InfiniteLoop1) {
+TEST(TransformationAddFunctionTest, InfiniteLoop) {
   std::string shader = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
@@ -2315,14 +2312,13 @@ TEST(TransformationAddFunctionTest, InfiniteLoop1) {
   )";
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %6 in
   // |donor|.
@@ -2337,54 +2333,11 @@ TEST(TransformationAddFunctionTest, InfiniteLoop1) {
   loop_limiter_info.set_logical_op_id(105);
   TransformationAddFunction add_livesafe_function(instructions, 100, 32,
                                                   {loop_limiter_info}, 0, {});
-  ASSERT_TRUE(add_livesafe_function.IsApplicable(context.get(),
-                                                 transformation_context));
-  add_livesafe_function.Apply(context.get(), &transformation_context);
-  ASSERT_TRUE(IsValid(env, context.get()));
-  std::string expected = R"(
-               OpCapability Shader
-          %1 = OpExtInstImport "GLSL.std.450"
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint Fragment %4 "main"
-               OpExecutionMode %4 OriginUpperLeft
-               OpSource ESSL 310
-          %2 = OpTypeVoid
-          %3 = OpTypeFunction %2
-          %8 = OpTypeInt 32 1
-          %9 = OpTypePointer Function %8
-         %11 = OpConstant %8 0
-         %18 = OpConstant %8 10
-         %19 = OpTypeBool
-         %26 = OpConstantTrue %19
-         %27 = OpConstantFalse %19
-         %28 = OpTypeInt 32 0
-         %29 = OpTypePointer Function %28
-         %30 = OpConstant %28 0
-         %31 = OpConstant %28 1
-         %32 = OpConstant %28 5
-         %22 = OpConstant %8 1
-          %4 = OpFunction %2 None %3
-          %5 = OpLabel
-               OpReturn
-               OpFunctionEnd
-          %6 = OpFunction %2 None %3
-          %7 = OpLabel
-        %100 = OpVariable %29 Function %30
-         %10 = OpVariable %9 Function
-               OpStore %10 %11
-               OpBranch %12
-         %12 = OpLabel
-        %102 = OpLoad %28 %100
-        %103 = OpIAdd %28 %102 %31
-               OpStore %100 %103
-        %104 = OpUGreaterThanEqual %19 %102 %32
-               OpLoopMerge %14 %12 None
-               OpBranchConditional %104 %14 %12
-         %14 = OpLabel
-               OpReturn
-               OpFunctionEnd
-  )";
-  ASSERT_TRUE(IsEqual(env, expected, context.get()));
+
+  // To make sure the loop's merge block is reachable, it must be dominated by
+  // the loop header.
+  ASSERT_FALSE(add_livesafe_function.IsApplicable(context.get(),
+                                                  transformation_context));
 }
 
 TEST(TransformationAddFunctionTest, UnreachableContinueConstruct) {
@@ -2473,14 +2426,13 @@ TEST(TransformationAddFunctionTest, UnreachableContinueConstruct) {
 
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %6 in
   // |donor|.
@@ -2639,14 +2591,13 @@ TEST(TransformationAddFunctionTest, LoopLimitersAndOpPhi1) {
 
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %8 in
   // |donor|.
@@ -2832,14 +2783,13 @@ TEST(TransformationAddFunctionTest, LoopLimitersAndOpPhi2) {
 
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %8 in
   // |donor|.
@@ -2983,14 +2933,13 @@ TEST(TransformationAddFunctionTest, StaticallyOutOfBoundsArrayAccess) {
   )";
   const auto env = SPV_ENV_UNIVERSAL_1_4;
   const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
-
-  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
-  ASSERT_TRUE(IsValid(env, context.get()));
 
   // Make a sequence of instruction messages corresponding to function %6 in
   // |donor|.

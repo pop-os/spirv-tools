@@ -36,6 +36,12 @@ void FuzzerPassAddSynonyms::Apply() {
       [this](opt::Function* function, opt::BasicBlock* block,
              opt::BasicBlock::iterator inst_it,
              const protobufs::InstructionDescriptor& instruction_descriptor) {
+        if (GetTransformationContext()->GetFactManager()->BlockIsDead(
+                block->id())) {
+          // Don't create synonyms in dead blocks.
+          return;
+        }
+
         // Skip |inst_it| if we can't insert anything above it. OpIAdd is just
         // a representative of some instruction that might be produced by the
         // transformation.
@@ -77,7 +83,7 @@ void FuzzerPassAddSynonyms::Apply() {
           case protobufs::TransformationAddSynonym::LOGICAL_OR:
             // Create a zero constant to be used as an operand of the synonymous
             // instruction.
-            FindOrCreateZeroConstant(existing_synonym->type_id());
+            FindOrCreateZeroConstant(existing_synonym->type_id(), false);
             break;
           case protobufs::TransformationAddSynonym::MUL_ONE:
           case protobufs::TransformationAddSynonym::LOGICAL_AND: {
@@ -97,13 +103,13 @@ void FuzzerPassAddSynonyms::Apply() {
               FindOrCreateCompositeConstant(
                   std::vector<uint32_t>(
                       vector->element_count(),
-                      FindOrCreateConstant({one_word}, element_type_id)),
-                  existing_synonym->type_id());
+                      FindOrCreateConstant({one_word}, element_type_id, false)),
+                  existing_synonym->type_id(), false);
             } else {
               FindOrCreateConstant(
                   {existing_synonym_type->AsFloat() ? fuzzerutil::FloatToWord(1)
                                                     : 1u},
-                  existing_synonym->type_id());
+                  existing_synonym->type_id(), false);
             }
           } break;
           default:

@@ -21,20 +21,6 @@
 namespace spvtools {
 namespace fuzz {
 
-namespace {
-
-std::map<uint32_t, uint32_t> PairSequenceToMap(
-    const google::protobuf::RepeatedPtrField<protobufs::UInt32Pair>&
-        pair_sequence) {
-  std::map<uint32_t, uint32_t> result;
-  for (auto& pair : pair_sequence) {
-    result[pair.first()] = pair.second();
-  }
-  return result;
-}
-
-}  // namespace
-
 TransformationOutlineFunction::TransformationOutlineFunction(
     const spvtools::fuzz::protobufs::TransformationOutlineFunction& message)
     : message_(message) {}
@@ -55,22 +41,15 @@ TransformationOutlineFunction::TransformationOutlineFunction(
   message_.set_new_function_region_entry_block(new_function_region_entry_block);
   message_.set_new_caller_result_id(new_caller_result_id);
   message_.set_new_callee_result_id(new_callee_result_id);
-  for (auto& entry : input_id_to_fresh_id) {
-    protobufs::UInt32Pair pair;
-    pair.set_first(entry.first);
-    pair.set_second(entry.second);
-    *message_.add_input_id_to_fresh_id() = pair;
-  }
-  for (auto& entry : output_id_to_fresh_id) {
-    protobufs::UInt32Pair pair;
-    pair.set_first(entry.first);
-    pair.set_second(entry.second);
-    *message_.add_output_id_to_fresh_id() = pair;
-  }
+  *message_.mutable_input_id_to_fresh_id() =
+      fuzzerutil::MapToRepeatedUInt32Pair(input_id_to_fresh_id);
+  *message_.mutable_output_id_to_fresh_id() =
+      fuzzerutil::MapToRepeatedUInt32Pair(output_id_to_fresh_id);
 }
 
 bool TransformationOutlineFunction::IsApplicable(
-    opt::IRContext* ir_context, const TransformationContext& /*unused*/) const {
+    opt::IRContext* ir_context,
+    const TransformationContext& transformation_context) const {
   std::set<uint32_t> ids_used_by_this_transformation;
 
   // The various new ids used by the transformation must be fresh and distinct.
@@ -252,12 +231,13 @@ bool TransformationOutlineFunction::IsApplicable(
 
   // For each region input id, i.e. every id defined outside the region but
   // used inside the region, ...
-  std::map<uint32_t, uint32_t> input_id_to_fresh_id_map =
-      PairSequenceToMap(message_.input_id_to_fresh_id());
+  auto input_id_to_fresh_id_map =
+      fuzzerutil::RepeatedUInt32PairToMap(message_.input_id_to_fresh_id());
   for (auto id : GetRegionInputIds(ir_context, region_set, exit_block)) {
     // There needs to be a corresponding fresh id to be used as a function
-    // parameter.
-    if (input_id_to_fresh_id_map.count(id) == 0) {
+    // parameter, or overflow ids need to be available.
+    if (input_id_to_fresh_id_map.count(id) == 0 &&
+        !transformation_context.GetOverflowIdSource()->HasOverflowIds()) {
       return false;
     }
     // Furthermore, if the input id has pointer type it must be an OpVariable
@@ -280,13 +260,15 @@ bool TransformationOutlineFunction::IsApplicable(
 
   // For each region output id -- i.e. every id defined inside the region but
   // used outside the region, ...
-  std::map<uint32_t, uint32_t> output_id_to_fresh_id_map =
-      PairSequenceToMap(message_.output_id_to_fresh_id());
+  auto output_id_to_fresh_id_map =
+      fuzzerutil::RepeatedUInt32PairToMap(message_.output_id_to_fresh_id());
   for (auto id : GetRegionOutputIds(ir_context, region_set, exit_block)) {
     if (
         // ... there needs to be a corresponding fresh id that can hold the
-        // value for this id computed in the outlined function, and ...
-        output_id_to_fresh_id_map.count(id) == 0
+        // value for this id computed in the outlined function (or overflow ids
+        // must be available), and ...
+        (output_id_to_fresh_id_map.count(id) == 0 &&
+         !transformation_context.GetOverflowIdSource()->HasOverflowIds())
         // ... the output id must not have pointer type (to avoid creating a
         // struct with pointer members to pass data out of the outlined
         // function)
@@ -323,10 +305,27 @@ void TransformationOutlineFunction::Apply(
       GetRegionOutputIds(ir_context, region_blocks, original_region_exit_block);
 
   // Maps from input and output ids to fresh ids.
-  std::map<uint32_t, uint32_t> input_id_to_fresh_id_map =
-      PairSequenceToMap(message_.input_id_to_fresh_id());
-  std::map<uint32_t, uint32_t> output_id_to_fresh_id_map =
-      PairSequenceToMap(message_.output_id_to_fresh_id());
+  auto input_id_to_fresh_id_map =
+      fuzzerutil::RepeatedUInt32PairToMap(message_.input_id_to_fresh_id());
+  auto output_id_to_fresh_id_map =
+      fuzzerutil::RepeatedUInt32PairToMap(message_.output_id_to_fresh_id());
+
+  // Use overflow ids to augment these maps at any locations where fresh ids are
+  // required but not provided.
+  for (uint32_t id : region_input_ids) {
+    if (input_id_to_fresh_id_map.count(id) == 0) {
+      input_id_to_fresh_id_map.insert(
+          {id,
+           transformation_context->GetOverflowIdSource()->GetNextOverflowId()});
+    }
+  }
+  for (uint32_t id : region_output_ids) {
+    if (output_id_to_fresh_id_map.count(id) == 0) {
+      output_id_to_fresh_id_map.insert(
+          {id,
+           transformation_context->GetOverflowIdSource()->GetNextOverflowId()});
+    }
+  }
 
   UpdateModuleIdBoundForFreshIds(ir_context, input_id_to_fresh_id_map,
                                  output_id_to_fresh_id_map);
@@ -452,7 +451,6 @@ std::vector<uint32_t> TransformationOutlineFunction::GetRegionInputIds(
           inst,
           [ir_context, &inst, region_exit_block, &region_set, &result](
               opt::Instruction* use, uint32_t /*unused*/) -> bool {
-
             // Find the block in which this id use occurs, recording the id as
             // an input id if the block is outside the region, with some
             // exceptions detailed below.
@@ -501,7 +499,6 @@ std::vector<uint32_t> TransformationOutlineFunction::GetRegionOutputIds(
           &inst,
           [&region_set, ir_context, &inst, region_exit_block, &result](
               opt::Instruction* use, uint32_t /*unused*/) -> bool {
-
             // Find the block in which this id use occurs, recording the id as
             // an output id if the block is outside the region, with some
             // exceptions detailed below.
@@ -631,12 +628,22 @@ TransformationOutlineFunction::PrepareFunctionPrototype(
                 {function_type_id}}})));
 
   // Add one parameter to the function for each input id, using the fresh ids
-  // provided in |input_id_to_fresh_id_map|.
+  // provided in |input_id_to_fresh_id_map|, or overflow ids if needed.
   for (auto id : region_input_ids) {
+    uint32_t fresh_id = input_id_to_fresh_id_map.at(id);
     outlined_function->AddParameter(MakeUnique<opt::Instruction>(
         ir_context, SpvOpFunctionParameter,
-        ir_context->get_def_use_mgr()->GetDef(id)->type_id(),
-        input_id_to_fresh_id_map.at(id), opt::Instruction::OperandList()));
+        ir_context->get_def_use_mgr()->GetDef(id)->type_id(), fresh_id,
+        opt::Instruction::OperandList()));
+
+    // Analyse the use of the new parameter instruction.
+    outlined_function->ForEachParam(
+        [fresh_id, ir_context](opt::Instruction* inst) {
+          if (inst->result_id() == fresh_id) {
+            ir_context->AnalyzeDefUse(inst);
+          }
+        });
+
     // If the input id is an irrelevant-valued variable, the same should be true
     // of the corresponding parameter.
     if (transformation_context->GetFactManager()->PointeeValueIsIrrelevant(

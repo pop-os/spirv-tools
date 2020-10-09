@@ -83,27 +83,9 @@ bool TransformationSplitBlock::IsApplicable(
 
   // Splitting the block must not separate the definition of an OpSampledImage
   // from its use: the SPIR-V data rules require them to be in the same block.
-  std::set<uint32_t> sampled_image_result_ids;
-  bool before_split = true;
-  for (auto& instruction : *block_to_split) {
-    if (&instruction == &*split_before) {
-      before_split = false;
-    }
-    if (before_split) {
-      if (instruction.opcode() == SpvOpSampledImage) {
-        sampled_image_result_ids.insert(instruction.result_id());
-      }
-    } else {
-      if (!instruction.WhileEachInId(
-              [&sampled_image_result_ids](uint32_t* id) -> bool {
-                return !sampled_image_result_ids.count(*id);
-              })) {
-        return false;
-      }
-    }
-  }
-
-  return true;
+  return !fuzzerutil::
+      SplittingBeforeInstructionSeparatesOpSampledImageDefinitionFromUse(
+          block_to_split, instruction_to_split_before);
 }
 
 void TransformationSplitBlock::Apply(
@@ -135,11 +117,10 @@ void TransformationSplitBlock::Apply(
   // predecessor operand so that the block they used to be inside is now the
   // predecessor.
   new_bb->ForEachPhiInst([block_to_split](opt::Instruction* phi_inst) {
-    // The following assertion is a sanity check.  It is guaranteed to hold
-    // if IsApplicable holds.
-    assert(phi_inst->NumInOperands() == 2 &&
-           "We can only split a block before an OpPhi if block has exactly "
-           "one predecessor.");
+    assert(
+        phi_inst->NumInOperands() == 2 &&
+        "Precondition: a block can only be split before an OpPhi if the block"
+        "has exactly one predecessor.");
     phi_inst->SetInOperand(1, {block_to_split->id()});
   });
 

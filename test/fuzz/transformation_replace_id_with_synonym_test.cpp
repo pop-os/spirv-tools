@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "source/fuzz/transformation_replace_id_with_synonym.h"
+
 #include "source/fuzz/data_descriptor.h"
 #include "source/fuzz/id_use_descriptor.h"
 #include "source/fuzz/instruction_descriptor.h"
@@ -198,18 +199,18 @@ protobufs::Fact MakeSynonymFact(uint32_t first, uint32_t second) {
 }
 
 // Equips the fact manager with synonym facts for the above shader.
-void SetUpIdSynonyms(FactManager* fact_manager, opt::IRContext* context) {
-  fact_manager->AddFact(MakeSynonymFact(15, 200), context);
-  fact_manager->AddFact(MakeSynonymFact(15, 201), context);
-  fact_manager->AddFact(MakeSynonymFact(15, 202), context);
-  fact_manager->AddFact(MakeSynonymFact(55, 203), context);
-  fact_manager->AddFact(MakeSynonymFact(54, 204), context);
-  fact_manager->AddFact(MakeSynonymFact(74, 205), context);
-  fact_manager->AddFact(MakeSynonymFact(78, 206), context);
-  fact_manager->AddFact(MakeSynonymFact(84, 207), context);
-  fact_manager->AddFact(MakeSynonymFact(33, 208), context);
-  fact_manager->AddFact(MakeSynonymFact(12, 209), context);
-  fact_manager->AddFact(MakeSynonymFact(19, 210), context);
+void SetUpIdSynonyms(FactManager* fact_manager) {
+  fact_manager->AddFact(MakeSynonymFact(15, 200));
+  fact_manager->AddFact(MakeSynonymFact(15, 201));
+  fact_manager->AddFact(MakeSynonymFact(15, 202));
+  fact_manager->AddFact(MakeSynonymFact(55, 203));
+  fact_manager->AddFact(MakeSynonymFact(54, 204));
+  fact_manager->AddFact(MakeSynonymFact(74, 205));
+  fact_manager->AddFact(MakeSynonymFact(78, 206));
+  fact_manager->AddFact(MakeSynonymFact(84, 207));
+  fact_manager->AddFact(MakeSynonymFact(33, 208));
+  fact_manager->AddFact(MakeSynonymFact(12, 209));
+  fact_manager->AddFact(MakeSynonymFact(19, 210));
 }
 
 TEST(TransformationReplaceIdWithSynonymTest, IllegalTransformations) {
@@ -219,12 +220,12 @@ TEST(TransformationReplaceIdWithSynonymTest, IllegalTransformations) {
       BuildModule(env, consumer, kComplexShader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
 
-  SetUpIdSynonyms(transformation_context.GetFactManager(), context.get());
+  SetUpIdSynonyms(transformation_context.GetFactManager());
 
   // %202 cannot replace %15 as in-operand 0 of %300, since %202 does not
   // dominate %300.
@@ -294,12 +295,12 @@ TEST(TransformationReplaceIdWithSynonymTest, LegalTransformations) {
       BuildModule(env, consumer, kComplexShader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
 
-  SetUpIdSynonyms(transformation_context.GetFactManager(), context.get());
+  SetUpIdSynonyms(transformation_context.GetFactManager());
 
   auto global_constant_synonym = TransformationReplaceIdWithSynonym(
       MakeIdUseDescriptor(19, MakeInstructionDescriptor(47, SpvOpStore, 0), 1),
@@ -517,15 +518,13 @@ TEST(TransformationReplaceIdWithSynonymTest, SynonymsOfVariables) {
   const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
 
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(10, 100),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(8, 101),
-                                                   context.get());
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(10, 100));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(8, 101));
 
   // Replace %10 with %100 in:
   // %11 = OpLoad %6 %10
@@ -651,13 +650,12 @@ TEST(TransformationReplaceIdWithSynonymTest,
   const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
 
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(14, 100),
-                                                   context.get());
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(14, 100));
 
   // Replace %14 with %100 in:
   // %16 = OpFunctionCall %2 %10 %14
@@ -806,7 +804,7 @@ TEST(TransformationReplaceIdWithSynonymTest, SynonymsOfAccessChainIndices) {
                OpStore %53 %32
          %56 = OpAccessChain %23 %50 %17 %21 %21 %55
                OpStore %56 %54
-         %58 = OpAccessChain %26 %50 %57 %21 %17
+         %58 = OpInBoundsAccessChain %26 %50 %57 %21 %17
                OpStore %58 %45
                OpReturn
                OpFunctionEnd
@@ -817,39 +815,26 @@ TEST(TransformationReplaceIdWithSynonymTest, SynonymsOfAccessChainIndices) {
   const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
 
   // Add synonym facts corresponding to the OpCopyObject operations that have
   // been applied to all constants in the module.
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(16, 100),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(21, 101),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(17, 102),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(57, 103),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(18, 104),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(40, 105),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(32, 106),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(43, 107),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(55, 108),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(8, 109),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(47, 110),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(28, 111),
-                                                   context.get());
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(45, 112),
-                                                   context.get());
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(16, 100));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(21, 101));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(17, 102));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(57, 103));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(18, 104));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(40, 105));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(32, 106));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(43, 107));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(55, 108));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(8, 109));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(47, 110));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(28, 111));
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(45, 112));
 
   // Replacements of the form %16 -> %100
 
@@ -1031,12 +1016,12 @@ TEST(TransformationReplaceIdWithSynonymTest, SynonymsOfAccessChainIndices) {
   ASSERT_FALSE(
       replacement17.IsApplicable(context.get(), transformation_context));
 
-  // %58 = OpAccessChain %26 %50 %57 *%21* %17
+  // %58 = OpInBoundsAccessChain %26 %50 %57 *%21* %17
   // Corresponds to i[3].*g*.c
   // The index %24 used for g cannot be replaced
   auto replacement18 = TransformationReplaceIdWithSynonym(
       MakeIdUseDescriptor(
-          21, MakeInstructionDescriptor(58, SpvOpAccessChain, 0), 2),
+          21, MakeInstructionDescriptor(58, SpvOpInBoundsAccessChain, 0), 2),
       101);
   ASSERT_FALSE(
       replacement18.IsApplicable(context.get(), transformation_context));
@@ -1087,24 +1072,24 @@ TEST(TransformationReplaceIdWithSynonymTest, SynonymsOfAccessChainIndices) {
   replacement22.Apply(context.get(), &transformation_context);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  // %58 = OpAccessChain %26 %50 %57 %21 %17
+  // %58 = OpInBoundsAccessChain %26 %50 %57 %21 %17
   // Corresponds to i[3].g.*c*
   // The index %17 used for c cannot be replaced
   auto replacement23 = TransformationReplaceIdWithSynonym(
       MakeIdUseDescriptor(
-          17, MakeInstructionDescriptor(58, SpvOpAccessChain, 0), 3),
+          17, MakeInstructionDescriptor(58, SpvOpInBoundsAccessChain, 0), 3),
       102);
   ASSERT_FALSE(
       replacement23.IsApplicable(context.get(), transformation_context));
 
   // Replacements of the form %57 -> %103
 
-  // %58 = OpAccessChain %26 %50 *%57* %21 %17
+  // %58 = OpInBoundsAccessChain %26 %50 *%57* %21 %17
   // Corresponds to i[*3*].g.c
   // The index %57 used for 3 *can* be replaced
   auto replacement24 = TransformationReplaceIdWithSynonym(
       MakeIdUseDescriptor(
-          57, MakeInstructionDescriptor(58, SpvOpAccessChain, 0), 1),
+          57, MakeInstructionDescriptor(58, SpvOpInBoundsAccessChain, 0), 1),
       103);
   ASSERT_TRUE(
       replacement24.IsApplicable(context.get(), transformation_context));
@@ -1268,7 +1253,7 @@ TEST(TransformationReplaceIdWithSynonymTest, SynonymsOfAccessChainIndices) {
                OpStore %53 %32
          %56 = OpAccessChain %23 %50 %102 %21 %21 %108
                OpStore %56 %54
-         %58 = OpAccessChain %26 %50 %103 %21 %17
+         %58 = OpInBoundsAccessChain %26 %50 %103 %21 %17
                OpStore %58 %45
                OpReturn
                OpFunctionEnd
@@ -1318,17 +1303,15 @@ TEST(TransformationReplaceIdWithSynonymTest, RuntimeArrayTest) {
   const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
 
   // Add synonym fact relating %50 and %12.
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(50, 12),
-                                                   context.get());
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(50, 12));
   // Add synonym fact relating %51 and %14.
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(51, 14),
-                                                   context.get());
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(51, 14));
 
   // Not legal because the index being replaced is a struct index.
   ASSERT_FALSE(
@@ -1431,14 +1414,13 @@ TEST(TransformationReplaceIdWithSynonymTest,
   const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
   ASSERT_TRUE(IsValid(env, context.get()));
 
-  FactManager fact_manager;
+  FactManager fact_manager(context.get());
   spvtools::ValidatorOptions validator_options;
   TransformationContext transformation_context(&fact_manager,
                                                validator_options);
 
   // Add synonym fact relating %100 and %9.
-  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(100, 9),
-                                                   context.get());
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(100, 9));
 
   // Not legal the Sample argument of OpImageTexelPointer needs to be a zero
   // constant.
@@ -1448,6 +1430,332 @@ TEST(TransformationReplaceIdWithSynonymTest,
               9, MakeInstructionDescriptor(20, SpvOpImageTexelPointer, 0), 2),
           100)
           .IsApplicable(context.get(), transformation_context));
+}
+
+TEST(TransformationReplaceIdWithSynonymTest, EquivalentIntegerConstants) {
+  // This checks that replacing an integer constant with an equivalent one with
+  // different signedness is allowed only when valid.
+  const std::string shader = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main"
+               OpExecutionMode %2 OriginUpperLeft
+               OpSource ESSL 310
+               OpName %2 "main"
+               OpName %3 "a"
+               OpDecorate %3 RelaxedPrecision
+          %4 = OpTypeVoid
+          %5 = OpTypeBool
+          %6 = OpConstantTrue %5
+          %7 = OpTypeFunction %4
+          %8 = OpTypeInt 32 1
+          %9 = OpTypePointer Function %8
+         %10 = OpConstant %8 1
+         %11 = OpTypeInt 32 0
+         %12 = OpTypePointer Function %11
+         %13 = OpConstant %11 1
+          %2 = OpFunction %4 None %7
+         %14 = OpLabel
+          %3 = OpVariable %9 Function
+         %15 = OpSNegate %8 %10
+         %16 = OpIAdd %8 %10 %10
+         %17 = OpSDiv %8 %10 %10
+         %18 = OpUDiv %11 %13 %13
+         %19 = OpBitwiseAnd %8 %10 %10
+         %20 = OpSelect %8 %6 %10 %17
+         %21 = OpIEqual %5 %10 %10
+               OpStore %3 %10
+               OpReturn
+               OpFunctionEnd
+  )";
+
+  const auto env = SPV_ENV_UNIVERSAL_1_3;
+  const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
+
+  FactManager fact_manager(context.get());
+  spvtools::ValidatorOptions validator_options;
+  TransformationContext transformation_context(&fact_manager,
+                                               validator_options);
+
+  // Add synonym fact relating %10 and %13 (equivalent integer constant with
+  // different signedness).
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(10, 13));
+
+  // Legal because OpSNegate always considers the integer as signed
+  auto replacement1 = TransformationReplaceIdWithSynonym(
+      MakeIdUseDescriptor(10, MakeInstructionDescriptor(15, SpvOpSNegate, 0),
+                          0),
+      13);
+  ASSERT_TRUE(replacement1.IsApplicable(context.get(), transformation_context));
+  replacement1.Apply(context.get(), &transformation_context);
+
+  // Legal because OpIAdd does not care about the signedness of the operands
+  auto replacement2 = TransformationReplaceIdWithSynonym(
+      MakeIdUseDescriptor(10, MakeInstructionDescriptor(16, SpvOpIAdd, 0), 0),
+      13);
+  ASSERT_TRUE(replacement2.IsApplicable(context.get(), transformation_context));
+  replacement2.Apply(context.get(), &transformation_context);
+
+  // Legal because OpSDiv does not care about the signedness of the operands
+  auto replacement3 = TransformationReplaceIdWithSynonym(
+      MakeIdUseDescriptor(10, MakeInstructionDescriptor(17, SpvOpSDiv, 0), 0),
+      13);
+  ASSERT_TRUE(replacement3.IsApplicable(context.get(), transformation_context));
+  replacement3.Apply(context.get(), &transformation_context);
+
+  // Not legal because OpUDiv requires unsigned integers
+  ASSERT_FALSE(TransformationReplaceIdWithSynonym(
+                   MakeIdUseDescriptor(
+                       13, MakeInstructionDescriptor(18, SpvOpUDiv, 0), 0),
+                   10)
+                   .IsApplicable(context.get(), transformation_context));
+
+  // Legal because OpSDiv does not care about the signedness of the operands
+  auto replacement4 = TransformationReplaceIdWithSynonym(
+      MakeIdUseDescriptor(10, MakeInstructionDescriptor(19, SpvOpBitwiseAnd, 0),
+                          0),
+      13);
+  ASSERT_TRUE(replacement4.IsApplicable(context.get(), transformation_context));
+  replacement4.Apply(context.get(), &transformation_context);
+
+  // Not legal because OpSelect requires both operands to have the same type as
+  // the result type
+  ASSERT_FALSE(TransformationReplaceIdWithSynonym(
+                   MakeIdUseDescriptor(
+                       10, MakeInstructionDescriptor(20, SpvOpUDiv, 0), 1),
+                   13)
+                   .IsApplicable(context.get(), transformation_context));
+
+  // Not legal because OpStore requires the object to match the type pointed
+  // to by the pointer.
+  ASSERT_FALSE(TransformationReplaceIdWithSynonym(
+                   MakeIdUseDescriptor(
+                       10, MakeInstructionDescriptor(21, SpvOpStore, 0), 1),
+                   13)
+                   .IsApplicable(context.get(), transformation_context));
+
+  ASSERT_TRUE(IsValid(env, context.get()));
+
+  const std::string after_transformation = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main"
+               OpExecutionMode %2 OriginUpperLeft
+               OpSource ESSL 310
+               OpName %2 "main"
+               OpName %3 "a"
+               OpDecorate %3 RelaxedPrecision
+          %4 = OpTypeVoid
+          %5 = OpTypeBool
+          %6 = OpConstantTrue %5
+          %7 = OpTypeFunction %4
+          %8 = OpTypeInt 32 1
+          %9 = OpTypePointer Function %8
+         %10 = OpConstant %8 1
+         %11 = OpTypeInt 32 0
+         %12 = OpTypePointer Function %11
+         %13 = OpConstant %11 1
+          %2 = OpFunction %4 None %7
+         %14 = OpLabel
+          %3 = OpVariable %9 Function
+         %15 = OpSNegate %8 %13
+         %16 = OpIAdd %8 %13 %10
+         %17 = OpSDiv %8 %13 %10
+         %18 = OpUDiv %11 %13 %13
+         %19 = OpBitwiseAnd %8 %13 %10
+         %20 = OpSelect %8 %6 %10 %17
+         %21 = OpIEqual %5 %10 %10
+               OpStore %3 %10
+               OpReturn
+               OpFunctionEnd
+  )";
+
+  ASSERT_TRUE(IsEqual(env, after_transformation, context.get()));
+}
+
+TEST(TransformationReplaceIdWithSynonymTest, EquivalentIntegerVectorConstants) {
+  // This checks that replacing an integer constant with an equivalent one with
+  // different signedness is allowed only when valid.
+  const std::string shader = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main"
+               OpExecutionMode %2 OriginUpperLeft
+               OpSource ESSL 310
+               OpName %2 "main"
+               OpName %3 "a"
+               OpDecorate %3 RelaxedPrecision
+               OpDecorate %4 RelaxedPrecision
+          %5 = OpTypeVoid
+          %6 = OpTypeFunction %5
+          %7 = OpTypeInt 32 1
+          %8 = OpTypeInt 32 0
+          %9 = OpTypeVector %7 4
+         %10 = OpTypeVector %8 4
+         %11 = OpTypePointer Function %9
+         %12 = OpConstant %7 1
+         %13 = OpConstant %8 1
+         %14 = OpConstantComposite %9 %12 %12 %12 %12
+         %15 = OpConstantComposite %10 %13 %13 %13 %13
+         %16 = OpTypePointer Function %7
+          %2 = OpFunction %5 None %6
+         %17 = OpLabel
+          %3 = OpVariable %11 Function
+         %18 = OpIAdd %9 %14 %14
+               OpStore %3 %14
+         %19 = OpAccessChain %16 %3 %13
+          %4 = OpLoad %7 %19
+               OpReturn
+               OpFunctionEnd
+  )";
+
+  const auto env = SPV_ENV_UNIVERSAL_1_3;
+  const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
+
+  FactManager fact_manager(context.get());
+  spvtools::ValidatorOptions validator_options;
+  TransformationContext transformation_context(&fact_manager,
+                                               validator_options);
+
+  // Add synonym fact relating %10 and %13 (equivalent integer vectors with
+  // different signedness).
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(14, 15));
+
+  // Legal because OpIAdd does not consider the signedness of the operands
+  auto replacement1 = TransformationReplaceIdWithSynonym(
+      MakeIdUseDescriptor(14, MakeInstructionDescriptor(18, SpvOpIAdd, 0), 0),
+      15);
+  ASSERT_TRUE(replacement1.IsApplicable(context.get(), transformation_context));
+  replacement1.Apply(context.get(), &transformation_context);
+
+  // Not legal because OpStore requires the object to match the type pointed
+  // to by the pointer.
+  ASSERT_FALSE(TransformationReplaceIdWithSynonym(
+                   MakeIdUseDescriptor(
+                       14, MakeInstructionDescriptor(18, SpvOpStore, 0), 1),
+                   15)
+                   .IsApplicable(context.get(), transformation_context));
+
+  // Add synonym fact relating %12 and %13 (equivalent integer constants with
+  // different signedness).
+  transformation_context.GetFactManager()->AddFact(MakeSynonymFact(12, 13));
+
+  // Legal because the indices of OpAccessChain are always treated as signed
+  auto replacement2 = TransformationReplaceIdWithSynonym(
+      MakeIdUseDescriptor(
+          13, MakeInstructionDescriptor(19, SpvOpAccessChain, 0), 1),
+      12);
+  ASSERT_TRUE(replacement2.IsApplicable(context.get(), transformation_context));
+  replacement2.Apply(context.get(), &transformation_context);
+
+  ASSERT_TRUE(IsValid(env, context.get()));
+
+  const std::string after_transformation = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main"
+               OpExecutionMode %2 OriginUpperLeft
+               OpSource ESSL 310
+               OpName %2 "main"
+               OpName %3 "a"
+               OpDecorate %3 RelaxedPrecision
+               OpDecorate %4 RelaxedPrecision
+          %5 = OpTypeVoid
+          %6 = OpTypeFunction %5
+          %7 = OpTypeInt 32 1
+          %8 = OpTypeInt 32 0
+          %9 = OpTypeVector %7 4
+         %10 = OpTypeVector %8 4
+         %11 = OpTypePointer Function %9
+         %12 = OpConstant %7 1
+         %13 = OpConstant %8 1
+         %14 = OpConstantComposite %9 %12 %12 %12 %12
+         %15 = OpConstantComposite %10 %13 %13 %13 %13
+         %16 = OpTypePointer Function %7
+          %2 = OpFunction %5 None %6
+         %17 = OpLabel
+          %3 = OpVariable %11 Function
+         %18 = OpIAdd %9 %15 %14
+               OpStore %3 %14
+         %19 = OpAccessChain %16 %3 %12
+          %4 = OpLoad %7 %19
+               OpReturn
+               OpFunctionEnd
+  )";
+
+  ASSERT_TRUE(IsEqual(env, after_transformation, context.get()));
+}
+
+TEST(TransformationReplaceIdWithSynonymTest, IncompatibleTypes) {
+  const std::string shader = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %2 "main"
+               OpExecutionMode %2 OriginUpperLeft
+               OpSource ESSL 310
+          %5 = OpTypeVoid
+          %6 = OpTypeFunction %5
+          %7 = OpTypeInt 32 1
+          %8 = OpTypeInt 32 0
+          %9 = OpTypeFloat 32
+         %12 = OpConstant %7 1
+         %13 = OpConstant %8 1
+         %10 = OpConstant %9 1
+          %2 = OpFunction %5 None %6
+         %17 = OpLabel
+         %18 = OpIAdd %7 %12 %13
+         %19 = OpFAdd %9 %10 %10
+               OpReturn
+               OpFunctionEnd
+  )";
+
+  const auto env = SPV_ENV_UNIVERSAL_1_3;
+  const auto consumer = nullptr;
+  const auto context = BuildModule(env, consumer, shader, kFuzzAssembleOption);
+  ASSERT_TRUE(IsValid(env, context.get()));
+
+  FactManager fact_manager(context.get());
+  spvtools::ValidatorOptions validator_options;
+  TransformationContext transformation_context(&fact_manager,
+                                               validator_options);
+
+  auto* op_i_add = context->get_def_use_mgr()->GetDef(18);
+  ASSERT_TRUE(op_i_add);
+
+  auto* op_f_add = context->get_def_use_mgr()->GetDef(19);
+  ASSERT_TRUE(op_f_add);
+
+  fact_manager.AddFactDataSynonym(MakeDataDescriptor(12, {}),
+                                  MakeDataDescriptor(13, {}));
+  fact_manager.AddFactDataSynonym(MakeDataDescriptor(12, {}),
+                                  MakeDataDescriptor(10, {}));
+
+  // Synonym differs only in signedness for OpIAdd.
+  ASSERT_TRUE(TransformationReplaceIdWithSynonym(
+                  MakeIdUseDescriptorFromUse(context.get(), op_i_add, 0), 13)
+                  .IsApplicable(context.get(), transformation_context));
+
+  // Synonym has wrong type for OpIAdd.
+  ASSERT_FALSE(TransformationReplaceIdWithSynonym(
+                   MakeIdUseDescriptorFromUse(context.get(), op_i_add, 0), 10)
+                   .IsApplicable(context.get(), transformation_context));
+
+  // Synonym has wrong type for OpFAdd.
+  ASSERT_FALSE(TransformationReplaceIdWithSynonym(
+                   MakeIdUseDescriptorFromUse(context.get(), op_f_add, 0), 12)
+                   .IsApplicable(context.get(), transformation_context));
+  ASSERT_FALSE(TransformationReplaceIdWithSynonym(
+                   MakeIdUseDescriptorFromUse(context.get(), op_f_add, 0), 13)
+                   .IsApplicable(context.get(), transformation_context));
 }
 
 }  // namespace
