@@ -1,3 +1,10 @@
+spirv-tools (2020.6-1) unstable; urgency=medium
+
+  * New upstream release. (Closes: #975164)
+  * control: Bump spirv-headers build-dep.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 09 Dec 2020 00:07:00 +0200
+
 spirv-tools (2020.5-1) unstable; urgency=medium
 
   * New upstream release.

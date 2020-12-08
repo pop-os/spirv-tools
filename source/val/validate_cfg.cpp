@@ -48,11 +48,11 @@ spv_result_t ValidatePhi(ValidationState_t& _, const Instruction* inst) {
               "basic blocks.";
   }
 
-  const Instruction* type_inst = _.FindDef(inst->type_id());
-  assert(type_inst);
-
-  const SpvOp type_opcode = type_inst->opcode();
-  if (type_opcode == SpvOpTypePointer &&
+  if (_.IsVoidType(inst->type_id())) {
+    return _.diag(SPV_ERROR_INVALID_DATA, inst)
+           << "OpPhi must not have void result type";
+  }
+  if (_.IsPointerType(inst->type_id()) &&
       _.addressing_model() == SpvAddressingModelLogical) {
     if (!_.features().variable_pointers &&
         !_.features().variable_pointers_storage_buffer) {
@@ -61,6 +61,10 @@ spv_result_t ValidatePhi(ValidationState_t& _, const Instruction* inst) {
              << "VariablePointers or VariablePointersStorageBuffer";
     }
   }
+
+  const Instruction* type_inst = _.FindDef(inst->type_id());
+  assert(type_inst);
+  const SpvOp type_opcode = type_inst->opcode();
 
   if (!_.options()->before_hlsl_legalization) {
     if (type_opcode == SpvOpTypeSampledImage ||
@@ -89,6 +93,8 @@ spv_result_t ValidatePhi(ValidationState_t& _, const Instruction* inst) {
            << block->predecessors()->size() << ").";
   }
 
+  std::unordered_set<uint32_t> observed_predecessors;
+
   for (size_t i = 3; i < inst->words().size(); ++i) {
     auto inc_id = inst->word(i);
     if (i % 2 == 1) {
@@ -115,6 +121,17 @@ spv_result_t ValidatePhi(ValidationState_t& _, const Instruction* inst) {
                << " is not a predecessor of <id> " << _.getIdName(block->id())
                << ".";
       }
+
+      // We must not have already seen this predecessor as one of the phi's
+      // operands.
+      if (observed_predecessors.count(inc_id) != 0) {
+        return _.diag(SPV_ERROR_INVALID_ID, inst)
+               << "OpPhi references incoming basic block <id> "
+               << _.getIdName(inc_id) << " multiple times.";
+      }
+
+      // Note the fact that we have now observed this predecessor.
+      observed_predecessors.insert(inc_id);
     }
   }
 
@@ -1097,6 +1114,8 @@ spv_result_t CfgPass(ValidationState_t& _, const Instruction* inst) {
     case SpvOpReturnValue:
     case SpvOpUnreachable:
     case SpvOpTerminateInvocation:
+    case SpvOpIgnoreIntersectionKHR:
+    case SpvOpTerminateRayKHR:
       _.current_function().RegisterBlockEnd(std::vector<uint32_t>());
       if (opcode == SpvOpKill) {
         _.current_function().RegisterExecutionModelLimitation(
@@ -1108,6 +1127,17 @@ spv_result_t CfgPass(ValidationState_t& _, const Instruction* inst) {
             SpvExecutionModelFragment,
             "OpTerminateInvocation requires Fragment execution model");
       }
+      if (opcode == SpvOpIgnoreIntersectionKHR) {
+        _.current_function().RegisterExecutionModelLimitation(
+            SpvExecutionModelAnyHitKHR,
+            "OpIgnoreIntersectionKHR requires AnyHit execution model");
+      }
+      if (opcode == SpvOpTerminateRayKHR) {
+        _.current_function().RegisterExecutionModelLimitation(
+            SpvExecutionModelAnyHitKHR,
+            "OpTerminateRayKHR requires AnyHit execution model");
+      }
+
       break;
     default:
       break;

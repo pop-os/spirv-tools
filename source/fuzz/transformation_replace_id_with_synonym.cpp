@@ -74,7 +74,7 @@ bool TransformationReplaceIdWithSynonym::IsApplicable(
 
   // Is the use suitable for being replaced in principle?
   if (!fuzzerutil::IdUseCanBeReplaced(
-          ir_context, use_instruction,
+          ir_context, transformation_context, use_instruction,
           message_.id_use_descriptor().in_operand_index())) {
     return false;
   }
@@ -157,6 +157,11 @@ bool TransformationReplaceIdWithSynonym::TypesAreCompatible(
   return type_id_1 == type_id_2 ||
          (IsAgnosticToSignednessOfOperand(opcode, use_in_operand_index) &&
           fuzzerutil::TypesAreEqualUpToSign(ir_context, type_id_1, type_id_2));
+}
+
+std::unordered_set<uint32_t> TransformationReplaceIdWithSynonym::GetFreshIds()
+    const {
+  return std::unordered_set<uint32_t>();
 }
 
 }  // namespace fuzz

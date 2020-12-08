@@ -47,7 +47,8 @@ TransformationDuplicateRegionWithSelection::
 }
 
 bool TransformationDuplicateRegionWithSelection::IsApplicable(
-    opt::IRContext* ir_context, const TransformationContext& /*unused*/) const {
+    opt::IRContext* ir_context,
+    const TransformationContext& transformation_context) const {
   // Instruction with the id |condition_id| must exist and must be of a bool
   // type.
   auto bool_instr =
@@ -107,6 +108,17 @@ bool TransformationDuplicateRegionWithSelection::IsApplicable(
 
   // |entry_block| cannot be the first block of the |enclosing_function|.
   if (&*enclosing_function->begin() == entry_block) {
+    return false;
+  }
+
+  // To make the process of resolving OpPhi instructions easier, we require that
+  // the entry block has only one predecessor.
+  auto entry_block_preds = ir_context->cfg()->preds(entry_block->id());
+  std::sort(entry_block_preds.begin(), entry_block_preds.end());
+  entry_block_preds.erase(
+      std::unique(entry_block_preds.begin(), entry_block_preds.end()),
+      entry_block_preds.end());
+  if (entry_block_preds.size() > 1) {
     return false;
   }
 
@@ -178,9 +190,6 @@ bool TransformationDuplicateRegionWithSelection::IsApplicable(
   }
 
   // Get the maps from the protobuf.
-  // TODO(https://github.com/KhronosGroup/SPIRV-Tools/issues/3786):
-  //     Consider additionally providing overflow ids to make this
-  //     transformation more applicable when shrinking.
   std::map<uint32_t, uint32_t> original_label_to_duplicate_label =
       fuzzerutil::RepeatedUInt32PairToMap(
           message_.original_label_to_duplicate_label());
@@ -193,61 +202,79 @@ bool TransformationDuplicateRegionWithSelection::IsApplicable(
       fuzzerutil::RepeatedUInt32PairToMap(message_.original_id_to_phi_id());
 
   for (auto block : region_set) {
-    auto label =
-        ir_context->get_def_use_mgr()->GetDef(block->id())->result_id();
     // The label of every block in the region must be present in the map
-    // |original_label_to_duplicate_label|.
-    if (original_label_to_duplicate_label.count(label) == 0) {
-      return false;
-    }
-    auto duplicate_label = original_label_to_duplicate_label[label];
-    // Each id assigned to labels in the region must be distinct and fresh.
-    if (!duplicate_label ||
-        !CheckIdIsFreshAndNotUsedByThisTransformation(
-            duplicate_label, ir_context, &ids_used_by_this_transformation)) {
-      return false;
+    // |original_label_to_duplicate_label|, unless overflow ids are present.
+    if (original_label_to_duplicate_label.count(block->id()) == 0) {
+      if (!transformation_context.GetOverflowIdSource()->HasOverflowIds()) {
+        return false;
+      }
+    } else {
+      auto duplicate_label = original_label_to_duplicate_label[block->id()];
+      // Each id assigned to labels in the region must be distinct and fresh.
+      if (!duplicate_label ||
+          !CheckIdIsFreshAndNotUsedByThisTransformation(
+              duplicate_label, ir_context, &ids_used_by_this_transformation)) {
+        return false;
+      }
     }
     for (auto instr : *block) {
       if (!instr.HasResultId()) {
         continue;
       }
       // Every instruction with a result id in the region must be present in the
-      // map |original_id_to_duplicate_id|.
+      // map |original_id_to_duplicate_id|, unless overflow ids are present.
       if (original_id_to_duplicate_id.count(instr.result_id()) == 0) {
-        return false;
-      }
-      auto duplicate_id = original_id_to_duplicate_id[instr.result_id()];
-      // Id assigned to this result id in the region must be distinct and fresh.
-      if (!duplicate_id ||
-          !CheckIdIsFreshAndNotUsedByThisTransformation(
-              duplicate_id, ir_context, &ids_used_by_this_transformation)) {
-        return false;
+        if (!transformation_context.GetOverflowIdSource()->HasOverflowIds()) {
+          return false;
+        }
+      } else {
+        auto duplicate_id = original_id_to_duplicate_id[instr.result_id()];
+        // Id assigned to this result id in the region must be distinct and
+        // fresh.
+        if (!duplicate_id ||
+            !CheckIdIsFreshAndNotUsedByThisTransformation(
+                duplicate_id, ir_context, &ids_used_by_this_transformation)) {
+          return false;
+        }
       }
       if (&instr == &*exit_block->tail() ||
           fuzzerutil::IdIsAvailableBeforeInstruction(
               ir_context, &*exit_block->tail(), instr.result_id())) {
-        // Every instruction with a result id available at the end of the region
-        // must be present in the map |original_id_to_phi_id|.
-        if (original_id_to_phi_id.count(instr.result_id()) == 0) {
-          return false;
-        }
-        // Using pointers with OpPhi requires capability VariablePointers.
         // TODO(https://github.com/KhronosGroup/SPIRV-Tools/issues/3787):
-        //     Consider not adding OpPhi instructions for the pointers which are
-        //     unused after the region, so that the transformation could be
-        //     still applicable.
-        if (ir_context->get_type_mgr()->GetType(instr.type_id())->AsPointer() &&
+        //     Consider not adding OpPhi instructions for the pointers and
+        //     sampled images which are unused after the region, so that the
+        //     transformation could be still applicable.
+
+        // Using pointers with OpPhi requires capability VariablePointers.
+        if (ir_context->get_def_use_mgr()->GetDef(instr.type_id())->opcode() ==
+                SpvOpTypePointer &&
             !ir_context->get_feature_mgr()->HasCapability(
                 SpvCapabilityVariablePointers)) {
           return false;
         }
-        auto phi_id = original_id_to_phi_id[instr.result_id()];
-        // Id assigned to this result id in the region must be distinct and
-        // fresh.
-        if (!phi_id ||
-            !CheckIdIsFreshAndNotUsedByThisTransformation(
-                phi_id, ir_context, &ids_used_by_this_transformation)) {
+
+        // OpTypeSampledImage cannot be the result type of an OpPhi instruction.
+        if (ir_context->get_def_use_mgr()->GetDef(instr.type_id())->opcode() ==
+            SpvOpTypeSampledImage) {
           return false;
+        }
+
+        // Every instruction with a result id available at the end of the region
+        // must be present in the map |original_id_to_phi_id|, unless overflow
+        // ids are present.
+        if (original_id_to_phi_id.count(instr.result_id()) == 0) {
+          if (!transformation_context.GetOverflowIdSource()->HasOverflowIds()) {
+            return false;
+          }
+        } else {
+          auto phi_id = original_id_to_phi_id[instr.result_id()];
+          // Id assigned to this result id in the region must be distinct and
+          // fresh.
+          if (!phi_id ||
+              !CheckIdIsFreshAndNotUsedByThisTransformation(
+                  phi_id, ir_context, &ids_used_by_this_transformation)) {
+            return false;
+          }
         }
       }
     }
@@ -256,7 +283,8 @@ bool TransformationDuplicateRegionWithSelection::IsApplicable(
 }
 
 void TransformationDuplicateRegionWithSelection::Apply(
-    opt::IRContext* ir_context, TransformationContext* /*unused*/) const {
+    opt::IRContext* ir_context,
+    TransformationContext* transformation_context) const {
   fuzzerutil::UpdateModuleIdBound(ir_context, message_.new_entry_fresh_id());
   fuzzerutil::UpdateModuleIdBound(ir_context, message_.merge_label_fresh_id());
 
@@ -292,6 +320,35 @@ void TransformationDuplicateRegionWithSelection::Apply(
 
   std::map<uint32_t, uint32_t> original_id_to_phi_id =
       fuzzerutil::RepeatedUInt32PairToMap(message_.original_id_to_phi_id());
+
+  // Use oveflow ids to fill in any required ids that are missing from these
+  // maps.
+  for (auto block : region_blocks) {
+    if (original_label_to_duplicate_label.count(block->id()) == 0) {
+      original_label_to_duplicate_label.insert(
+          {block->id(),
+           transformation_context->GetOverflowIdSource()->GetNextOverflowId()});
+    }
+    for (auto instr : *block) {
+      if (!instr.HasResultId()) {
+        continue;
+      }
+      if (original_id_to_duplicate_id.count(instr.result_id()) == 0) {
+        original_id_to_duplicate_id.insert(
+            {instr.result_id(), transformation_context->GetOverflowIdSource()
+                                    ->GetNextOverflowId()});
+      }
+      if (&instr == &*exit_block->tail() ||
+          fuzzerutil::IdIsAvailableBeforeInstruction(
+              ir_context, &*exit_block->tail(), instr.result_id())) {
+        if (original_id_to_phi_id.count(instr.result_id()) == 0) {
+          original_id_to_phi_id.insert(
+              {instr.result_id(), transformation_context->GetOverflowIdSource()
+                                      ->GetNextOverflowId()});
+        }
+      }
+    }
+  }
 
   // Before adding duplicate blocks, we need to update the OpPhi instructions in
   // the successors of the |exit_block|. We know that the execution of the
@@ -371,6 +428,7 @@ void TransformationDuplicateRegionWithSelection::Apply(
       if (block == exit_block && instr.IsBlockTerminator()) {
         switch (instr.opcode()) {
           case SpvOpBranch:
+          case SpvOpBranchConditional:
           case SpvOpReturn:
           case SpvOpReturnValue:
           case SpvOpUnreachable:
@@ -539,6 +597,21 @@ void TransformationDuplicateRegionWithSelection::Apply(
         }
       });
 
+  opt::Instruction* merge_block_terminator = merge_block->terminator();
+  switch (merge_block_terminator->opcode()) {
+    case SpvOpReturnValue:
+    case SpvOpBranchConditional: {
+      uint32_t operand = merge_block_terminator->GetSingleWordInOperand(0);
+      if (original_id_to_phi_id.count(operand)) {
+        merge_block_terminator->SetInOperand(
+            0, {original_id_to_phi_id.at(operand)});
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
   // Insert the merge block after the |duplicated_exit_block| (the
   // last duplicated block).
   enclosing_function->InsertBasicBlockAfter(std::move(merge_block),
@@ -586,6 +659,22 @@ protobufs::Transformation
 TransformationDuplicateRegionWithSelection::ToMessage() const {
   protobufs::Transformation result;
   *result.mutable_duplicate_region_with_selection() = message_;
+  return result;
+}
+
+std::unordered_set<uint32_t>
+TransformationDuplicateRegionWithSelection::GetFreshIds() const {
+  std::unordered_set<uint32_t> result = {message_.new_entry_fresh_id(),
+                                         message_.merge_label_fresh_id()};
+  for (auto& pair : message_.original_label_to_duplicate_label()) {
+    result.insert(pair.second());
+  }
+  for (auto& pair : message_.original_id_to_duplicate_id()) {
+    result.insert(pair.second());
+  }
+  for (auto& pair : message_.original_id_to_phi_id()) {
+    result.insert(pair.second());
+  }
   return result;
 }
 

@@ -20,21 +20,27 @@ namespace spvtools {
 namespace fuzz {
 
 namespace {
+
+// Limits to help control the overall fuzzing process and rein in individual
+// fuzzer passes.
+const uint32_t kIdBoundLimit = 50000;
+const uint32_t kTransformationLimit = 2000;
+
 // Default <minimum, maximum> pairs of probabilities for applying various
 // transformations. All values are percentages. Keep them in alphabetical order.
-
 const std::pair<uint32_t, uint32_t>
-    kChanceOfAcceptingRepeatedPassRecommendation = {70, 100};
+    kChanceOfAcceptingRepeatedPassRecommendation = {50, 80};
 const std::pair<uint32_t, uint32_t> kChanceOfAddingAccessChain = {5, 50};
-const std::pair<uint32_t, uint32_t> kChanceOfAddingAnotherPassToPassLoop = {85,
-                                                                            95};
+const std::pair<uint32_t, uint32_t> kChanceOfAddingAnotherPassToPassLoop = {50,
+                                                                            90};
 const std::pair<uint32_t, uint32_t> kChanceOfAddingAnotherStructField = {20,
                                                                          90};
 const std::pair<uint32_t, uint32_t> kChanceOfAddingArrayOrStructType = {20, 90};
-const std::pair<uint32_t, uint32_t> kChanceOfAddingBitInstructionSynonym = {20,
-                                                                            90};
+const std::pair<uint32_t, uint32_t> kChanceOfAddingBitInstructionSynonym = {5,
+                                                                            20};
 const std::pair<uint32_t, uint32_t>
     kChanceOfAddingBothBranchesWhenReplacingOpSelect = {40, 60};
+const std::pair<uint32_t, uint32_t> kChanceOfAddingCompositeExtract = {20, 50};
 const std::pair<uint32_t, uint32_t> kChanceOfAddingCompositeInsert = {20, 50};
 const std::pair<uint32_t, uint32_t> kChanceOfAddingCopyMemory = {20, 50};
 const std::pair<uint32_t, uint32_t> kChanceOfAddingDeadBlock = {20, 90};
@@ -80,8 +86,12 @@ const std::pair<uint32_t, uint32_t> kChanceOfCreatingIntSynonymsUsingLoops = {
 const std::pair<uint32_t, uint32_t> kChanceOfDonatingAdditionalModule = {5, 50};
 const std::pair<uint32_t, uint32_t> kChanceOfDuplicatingRegionWithSelection = {
     20, 50};
+const std::pair<uint32_t, uint32_t> kChanceOfExpandingVectorReduction = {20,
+                                                                         90};
 const std::pair<uint32_t, uint32_t> kChanceOfFlatteningConditionalBranch = {45,
                                                                             95};
+const std::pair<uint32_t, uint32_t> kChanceOfGoingDeeperToExtractComposite = {
+    30, 70};
 const std::pair<uint32_t, uint32_t> kChanceOfGoingDeeperToInsertInComposite = {
     30, 70};
 const std::pair<uint32_t, uint32_t> kChanceOfGoingDeeperWhenMakingAccessChain =
@@ -99,6 +109,7 @@ const std::pair<uint32_t, uint32_t> kChanceOfMakingDonorLivesafe = {40, 60};
 const std::pair<uint32_t, uint32_t> kChanceOfMakingVectorOperationDynamic = {
     20, 90};
 const std::pair<uint32_t, uint32_t> kChanceOfMergingBlocks = {20, 95};
+const std::pair<uint32_t, uint32_t> kChanceOfMergingFunctionReturns = {20, 90};
 const std::pair<uint32_t, uint32_t> kChanceOfMovingBlockDown = {20, 50};
 const std::pair<uint32_t, uint32_t> kChanceOfMutatingPointer = {20, 90};
 const std::pair<uint32_t, uint32_t> kChanceOfObfuscatingConstant = {10, 90};
@@ -106,11 +117,15 @@ const std::pair<uint32_t, uint32_t> kChanceOfOutliningFunction = {10, 90};
 const std::pair<uint32_t, uint32_t> kChanceOfPermutingInstructions = {20, 70};
 const std::pair<uint32_t, uint32_t> kChanceOfPermutingParameters = {30, 90};
 const std::pair<uint32_t, uint32_t> kChanceOfPermutingPhiOperands = {30, 90};
+const std::pair<uint32_t, uint32_t> kChanceOfPropagatingInstructionsDown = {20,
+                                                                            70};
 const std::pair<uint32_t, uint32_t> kChanceOfPropagatingInstructionsUp = {20,
                                                                           70};
 const std::pair<uint32_t, uint32_t> kChanceOfPushingIdThroughVariable = {5, 50};
 const std::pair<uint32_t, uint32_t>
     kChanceOfReplacingAddSubMulWithCarryingExtended = {20, 70};
+const std::pair<uint32_t, uint32_t>
+    kChanceOfReplacingBranchFromDeadBlockWithExit = {10, 65};
 const std::pair<uint32_t, uint32_t> kChanceOfReplacingCopyMemoryWithLoadStore =
     {20, 90};
 const std::pair<uint32_t, uint32_t> kChanceOfReplacingCopyObjectWithStoreLoad =
@@ -134,6 +149,8 @@ const std::pair<uint32_t, uint32_t> kChanceOfSwappingConditionalBranchOperands =
     {10, 70};
 const std::pair<uint32_t, uint32_t> kChanceOfTogglingAccessChainInstruction = {
     20, 90};
+const std::pair<uint32_t, uint32_t> kChanceOfWrappingRegionInSelection = {70,
+                                                                          90};
 
 // Default limits for various quantities that are chosen during fuzzing.
 // Keep them in alphabetical order.
@@ -190,6 +207,8 @@ FuzzerContext::FuzzerContext(RandomGenerator* random_generator,
       ChooseBetweenMinAndMax(kChanceOfAddingBitInstructionSynonym);
   chance_of_adding_both_branches_when_replacing_opselect_ =
       ChooseBetweenMinAndMax(kChanceOfAddingBothBranchesWhenReplacingOpSelect);
+  chance_of_adding_composite_extract_ =
+      ChooseBetweenMinAndMax(kChanceOfAddingCompositeExtract);
   chance_of_adding_composite_insert_ =
       ChooseBetweenMinAndMax(kChanceOfAddingCompositeInsert);
   chance_of_adding_copy_memory_ =
@@ -254,8 +273,12 @@ FuzzerContext::FuzzerContext(RandomGenerator* random_generator,
       ChooseBetweenMinAndMax(kChanceOfDonatingAdditionalModule);
   chance_of_duplicating_region_with_selection_ =
       ChooseBetweenMinAndMax(kChanceOfDuplicatingRegionWithSelection);
+  chance_of_expanding_vector_reduction_ =
+      ChooseBetweenMinAndMax(kChanceOfExpandingVectorReduction);
   chance_of_flattening_conditional_branch_ =
       ChooseBetweenMinAndMax(kChanceOfFlatteningConditionalBranch);
+  chance_of_going_deeper_to_extract_composite_ =
+      ChooseBetweenMinAndMax(kChanceOfGoingDeeperToExtractComposite);
   chance_of_going_deeper_to_insert_in_composite_ =
       ChooseBetweenMinAndMax(kChanceOfGoingDeeperToInsertInComposite);
   chance_of_going_deeper_when_making_access_chain_ =
@@ -275,6 +298,8 @@ FuzzerContext::FuzzerContext(RandomGenerator* random_generator,
   chance_of_making_vector_operation_dynamic_ =
       ChooseBetweenMinAndMax(kChanceOfMakingVectorOperationDynamic);
   chance_of_merging_blocks_ = ChooseBetweenMinAndMax(kChanceOfMergingBlocks);
+  chance_of_merging_function_returns_ =
+      ChooseBetweenMinAndMax(kChanceOfMergingFunctionReturns);
   chance_of_moving_block_down_ =
       ChooseBetweenMinAndMax(kChanceOfMovingBlockDown);
   chance_of_mutating_pointer_ =
@@ -289,12 +314,16 @@ FuzzerContext::FuzzerContext(RandomGenerator* random_generator,
       ChooseBetweenMinAndMax(kChanceOfPermutingParameters);
   chance_of_permuting_phi_operands_ =
       ChooseBetweenMinAndMax(kChanceOfPermutingPhiOperands);
+  chance_of_propagating_instructions_down_ =
+      ChooseBetweenMinAndMax(kChanceOfPropagatingInstructionsDown);
   chance_of_propagating_instructions_up_ =
       ChooseBetweenMinAndMax(kChanceOfPropagatingInstructionsUp);
   chance_of_pushing_id_through_variable_ =
       ChooseBetweenMinAndMax(kChanceOfPushingIdThroughVariable);
   chance_of_replacing_add_sub_mul_with_carrying_extended_ =
       ChooseBetweenMinAndMax(kChanceOfReplacingAddSubMulWithCarryingExtended);
+  chance_of_replacing_branch_from_dead_block_with_exit_ =
+      ChooseBetweenMinAndMax(kChanceOfReplacingBranchFromDeadBlockWithExit);
   chance_of_replacing_copy_memory_with_load_store_ =
       ChooseBetweenMinAndMax(kChanceOfReplacingCopyMemoryWithLoadStore);
   chance_of_replacing_copyobject_with_store_load_ =
@@ -320,6 +349,8 @@ FuzzerContext::FuzzerContext(RandomGenerator* random_generator,
       ChooseBetweenMinAndMax(kChanceOfSwappingConditionalBranchOperands);
   chance_of_toggling_access_chain_instruction_ =
       ChooseBetweenMinAndMax(kChanceOfTogglingAccessChainInstruction);
+  chance_of_wrapping_region_in_selection_ =
+      ChooseBetweenMinAndMax(kChanceOfWrappingRegionInSelection);
 }
 
 FuzzerContext::~FuzzerContext() = default;
@@ -364,6 +395,12 @@ FuzzerContext::GetRandomSynonymType() {
   assert(protobufs::TransformationAddSynonym::SynonymType_IsValid(result) &&
          "|result| is not a value of SynonymType");
   return static_cast<protobufs::TransformationAddSynonym::SynonymType>(result);
+}
+
+uint32_t FuzzerContext::GetIdBoundLimit() const { return kIdBoundLimit; }
+
+uint32_t FuzzerContext::GetTransformationLimit() const {
+  return kTransformationLimit;
 }
 
 }  // namespace fuzz

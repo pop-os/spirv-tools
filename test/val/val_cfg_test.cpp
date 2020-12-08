@@ -496,10 +496,10 @@ TEST_P(ValidateCFG, BranchTargetFirstBlockBadSinceEntryBlock) {
 
 TEST_P(ValidateCFG, BranchTargetFirstBlockBadSinceValue) {
   Block entry("entry");
-  entry.SetBody("%undef = OpUndef %voidt\n");
+  entry.SetBody("%undef = OpUndef %boolt\n");
   Block bad("bad");
   Block end("end", SpvOpReturn);
-  Block badvalue("undef");  // This referenes the OpUndef.
+  Block badvalue("undef");  // This references the OpUndef.
   std::string str = GetDefaultHeader(GetParam()) +
                     nameOps("entry", "bad", std::make_pair("func", "Main")) +
                     types_consts() +
@@ -4563,6 +4563,71 @@ OpFunctionEnd
   ASSERT_TRUE(b9->reachable());
   ASSERT_TRUE(b10->reachable());
   ASSERT_FALSE(b11->reachable());
+}
+
+TEST_F(ValidateCFG, PhiInstructionWithDuplicateIncomingEdges) {
+  const std::string text = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main"
+               OpExecutionMode %4 OriginUpperLeft
+               OpSource ESSL 320
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeBool
+          %7 = OpConstantTrue %6
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+               OpSelectionMerge %10 None
+               OpBranchConditional %7 %8 %9
+          %8 = OpLabel
+               OpBranch %10
+          %9 = OpLabel
+	       OpBranch %10
+         %10 = OpLabel
+	 %11 = OpPhi %6 %7 %8 %7 %8
+               OpReturn
+               OpFunctionEnd
+)";
+
+  CompileSuccessfully(text);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpPhi references incoming basic block <id> "));
+  EXPECT_THAT(getDiagnosticString(), HasSubstr("multiple times."));
+}
+
+TEST_F(ValidateCFG, PhiOnVoid) {
+  const std::string text = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main"
+               OpExecutionMode %4 OriginUpperLeft
+               OpSource ESSL 320
+               OpName %4 "main"
+               OpName %6 "foo("
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+          %8 = OpFunctionCall %2 %6
+               OpBranch %20
+         %20 = OpLabel
+         %21 = OpPhi %2 %8 %20
+               OpReturn
+               OpFunctionEnd
+          %6 = OpFunction %2 None %3
+          %7 = OpLabel
+               OpReturn
+               OpFunctionEnd
+)";
+
+  CompileSuccessfully(text);
+  EXPECT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("OpPhi must not have void result type"));
 }
 
 }  // namespace

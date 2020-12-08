@@ -153,13 +153,8 @@ void TransformationAddDeadBlock::Apply(
                                     : successor_block_id}}});
 
   // Add the new block to the enclosing function.
-  new_block->SetParent(enclosing_function);
   enclosing_function->InsertBasicBlockAfter(std::move(new_block),
                                             existing_block);
-
-  // Record the fact that the new block is dead.
-  transformation_context->GetFactManager()->AddFactBlockIsDead(
-      message_.fresh_id());
 
   // Fix up OpPhi instructions in the successor block, so that the values they
   // yield when control has transferred from the new block are the same as if
@@ -181,12 +176,20 @@ void TransformationAddDeadBlock::Apply(
   // Do not rely on any existing analysis results since the control flow graph
   // of the module has changed.
   ir_context->InvalidateAnalysesExceptFor(opt::IRContext::kAnalysisNone);
+
+  // Record the fact that the new block is dead.
+  transformation_context->GetFactManager()->AddFactBlockIsDead(
+      message_.fresh_id());
 }
 
 protobufs::Transformation TransformationAddDeadBlock::ToMessage() const {
   protobufs::Transformation result;
   *result.mutable_add_dead_block() = message_;
   return result;
+}
+
+std::unordered_set<uint32_t> TransformationAddDeadBlock::GetFreshIds() const {
+  return {message_.fresh_id()};
 }
 
 }  // namespace fuzz

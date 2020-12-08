@@ -15,6 +15,7 @@
 #ifndef SOURCE_FUZZ_FUZZER_UTIL_H_
 #define SOURCE_FUZZ_FUZZER_UTIL_H_
 
+#include <iostream>
 #include <map>
 #include <vector>
 
@@ -23,12 +24,16 @@
 #include "source/opt/basic_block.h"
 #include "source/opt/instruction.h"
 #include "source/opt/ir_context.h"
+#include "spirv-tools/libspirv.hpp"
 
 namespace spvtools {
 namespace fuzz {
 
 // Provides types and global utility methods for use by the fuzzer
 namespace fuzzerutil {
+
+// A silent message consumer.
+extern const spvtools::MessageConsumer kSilentMessageConsumer;
 
 // Function type that produces a SPIR-V module.
 using ModuleSupplier = std::function<std::unique_ptr<opt::IRContext>()>;
@@ -150,8 +155,18 @@ uint32_t GetBoundForCompositeIndex(const opt::Instruction& composite_type_inst,
                                    opt::IRContext* ir_context);
 
 // Returns true if and only if |context| is valid, according to the validator
-// instantiated with |validator_options|.
-bool IsValid(opt::IRContext* context, spv_validator_options validator_options);
+// instantiated with |validator_options|.  |consumer| is used for error
+// reporting.
+bool IsValid(const opt::IRContext* context,
+             spv_validator_options validator_options, MessageConsumer consumer);
+
+// Returns true if and only if IsValid(|context|, |validator_options|) holds,
+// and furthermore every basic block in |context| has its enclosing function as
+// its parent, and every instruction in |context| has a distinct unique id.
+// |consumer| is used for error reporting.
+bool IsValidAndWellFormed(const opt::IRContext* context,
+                          spv_validator_options validator_options,
+                          MessageConsumer consumer);
 
 // Returns a clone of |context|, by writing |context| to a binary and then
 // parsing it again.
@@ -163,6 +178,11 @@ bool IsNonFunctionTypeId(opt::IRContext* ir_context, uint32_t id);
 
 // Returns true if and only if |block_id| is a merge block or continue target
 bool IsMergeOrContinue(opt::IRContext* ir_context, uint32_t block_id);
+
+// Returns the id of the header of the loop corresponding to the given loop
+// merge block. Returns 0 if |merge_block_id| is not a loop merge block.
+uint32_t GetLoopFromMergeBlock(opt::IRContext* ir_context,
+                               uint32_t merge_block_id);
 
 // Returns the result id of an instruction of the form:
 //  %id = OpTypeFunction |type_ids|
@@ -368,11 +388,16 @@ uint32_t MaybeGetBoolType(opt::IRContext* ir_context);
 uint32_t MaybeGetVectorType(opt::IRContext* ir_context,
                             uint32_t component_type_id, uint32_t element_count);
 
-// Returns a result id of an OpTypeStruct instruction if present. Returns 0
+// Returns a result id of an OpTypeStruct instruction whose field types exactly
+// match |component_type_ids| if such an instruction is present. Returns 0
 // otherwise. |component_type_ids| may not contain a result id of an
 // OpTypeFunction.
 uint32_t MaybeGetStructType(opt::IRContext* ir_context,
                             const std::vector<uint32_t>& component_type_ids);
+
+// Returns a result id of an OpTypeVoid instruction if present. Returns 0
+// otherwise.
+uint32_t MaybeGetVoidType(opt::IRContext* ir_context);
 
 // Recursive definition is the following:
 // - if |scalar_or_composite_type_id| is a result id of a scalar type - returns
@@ -390,9 +415,10 @@ uint32_t MaybeGetZeroConstant(
     uint32_t scalar_or_composite_type_id, bool is_irrelevant);
 
 // Returns true if it is possible to create an OpConstant or an
-// OpConstantComposite instruction of |type|. That is, returns true if |type|
-// and all its constituents are either scalar or composite.
-bool CanCreateConstant(const opt::analysis::Type& type);
+// OpConstantComposite instruction of type |type_id|. That is, returns true if
+// the type associated with |type_id| and all its constituents are either scalar
+// or composite.
+bool CanCreateConstant(opt::IRContext* ir_context, uint32_t type_id);
 
 // Returns the result id of an OpConstant instruction. |scalar_type_id| must be
 // a result id of a scalar type (i.e. int, float or bool). Returns 0 if no such
@@ -519,13 +545,16 @@ opt::Instruction* GetLastInsertBeforeInstruction(opt::IRContext* ir_context,
 // replacing the id use at |use_in_operand_index| of |use_instruction| with a
 // synonym or another id of appropriate type if the original id is irrelevant.
 // In particular, this checks that:
-// - the id use is not an index into a struct field in an OpAccessChain - such
+// - If id use is an index of an irrelevant id (|use_in_operand_index > 0|)
+//   in OpAccessChain - it can't be replaced.
+// - The id use is not an index into a struct field in an OpAccessChain - such
 //   indices must be constants, so it is dangerous to replace them.
-// - the id use is not a pointer function call argument, on which there are
+// - The id use is not a pointer function call argument, on which there are
 //   restrictions that make replacement problematic.
-// - the id use is not the Sample parameter of an OpImageTexelPointer
+// - The id use is not the Sample parameter of an OpImageTexelPointer
 //   instruction, as this must satisfy particular requirements.
 bool IdUseCanBeReplaced(opt::IRContext* ir_context,
+                        const TransformationContext& transformation_context,
                         opt::Instruction* use_instruction,
                         uint32_t use_in_operand_index);
 
@@ -535,6 +564,12 @@ bool IdUseCanBeReplaced(opt::IRContext* ir_context,
 // BuiltIn decoration.
 bool MembersHaveBuiltInDecoration(opt::IRContext* ir_context,
                                   uint32_t struct_type_id);
+
+// Returns true if and only if |id| is decorated with either Block or
+// BufferBlock.  Even though these decorations are only allowed on struct types,
+// for convenience |id| can be any result id so that it is possible to call this
+// method on something that *might* be a struct type.
+bool HasBlockOrBufferBlockDecoration(opt::IRContext* ir_context, uint32_t id);
 
 // Returns true iff splitting block |block_to_split| just before the instruction
 // |split_before| would separate an OpSampledImage instruction from its usage.
@@ -546,6 +581,12 @@ bool SplittingBeforeInstructionSeparatesOpSampledImageDefinitionFromUse(
 //  missing instructions to the list. In particular, GLSL extended instructions
 //  (called using OpExtInst) have not been considered.
 bool InstructionHasNoSideEffects(const opt::Instruction& instruction);
+
+// Returns a set of the ids of all the return blocks that are reachable from
+// the entry block of |function_id|.
+// Assumes that the function exists in the module.
+std::set<uint32_t> GetReachableReturnBlocks(opt::IRContext* ir_context,
+                                            uint32_t function_id);
 
 }  // namespace fuzzerutil
 }  // namespace fuzz

@@ -17,6 +17,7 @@
 
 #include "source/fuzz/fuzzer_pass_add_access_chains.h"
 #include "source/fuzz/fuzzer_pass_add_bit_instruction_synonyms.h"
+#include "source/fuzz/fuzzer_pass_add_composite_extract.h"
 #include "source/fuzz/fuzzer_pass_add_composite_inserts.h"
 #include "source/fuzz/fuzzer_pass_add_composite_types.h"
 #include "source/fuzz/fuzzer_pass_add_copy_memory.h"
@@ -42,20 +43,24 @@
 #include "source/fuzz/fuzzer_pass_copy_objects.h"
 #include "source/fuzz/fuzzer_pass_donate_modules.h"
 #include "source/fuzz/fuzzer_pass_duplicate_regions_with_selections.h"
+#include "source/fuzz/fuzzer_pass_expand_vector_reductions.h"
 #include "source/fuzz/fuzzer_pass_flatten_conditional_branches.h"
 #include "source/fuzz/fuzzer_pass_inline_functions.h"
 #include "source/fuzz/fuzzer_pass_invert_comparison_operators.h"
 #include "source/fuzz/fuzzer_pass_make_vector_operations_dynamic.h"
 #include "source/fuzz/fuzzer_pass_merge_blocks.h"
+#include "source/fuzz/fuzzer_pass_merge_function_returns.h"
 #include "source/fuzz/fuzzer_pass_mutate_pointers.h"
 #include "source/fuzz/fuzzer_pass_obfuscate_constants.h"
 #include "source/fuzz/fuzzer_pass_outline_functions.h"
 #include "source/fuzz/fuzzer_pass_permute_blocks.h"
 #include "source/fuzz/fuzzer_pass_permute_function_parameters.h"
 #include "source/fuzz/fuzzer_pass_permute_instructions.h"
+#include "source/fuzz/fuzzer_pass_propagate_instructions_down.h"
 #include "source/fuzz/fuzzer_pass_propagate_instructions_up.h"
 #include "source/fuzz/fuzzer_pass_push_ids_through_variables.h"
 #include "source/fuzz/fuzzer_pass_replace_adds_subs_muls_with_carrying_extended.h"
+#include "source/fuzz/fuzzer_pass_replace_branches_from_dead_blocks_with_exits.h"
 #include "source/fuzz/fuzzer_pass_replace_copy_memories_with_loads_stores.h"
 #include "source/fuzz/fuzzer_pass_replace_copy_objects_with_stores_loads.h"
 #include "source/fuzz/fuzzer_pass_replace_irrelevant_ids.h"
@@ -67,6 +72,7 @@
 #include "source/fuzz/fuzzer_pass_replace_params_with_struct.h"
 #include "source/fuzz/fuzzer_pass_split_blocks.h"
 #include "source/fuzz/fuzzer_pass_swap_conditional_branch_operands.h"
+#include "source/fuzz/fuzzer_pass_wrap_regions_in_selections.h"
 
 namespace spvtools {
 namespace fuzz {
@@ -106,6 +112,7 @@ class RepeatedPassInstances {
 
   REPEATED_PASS_INSTANCE(AddAccessChains);
   REPEATED_PASS_INSTANCE(AddBitInstructionSynonyms);
+  REPEATED_PASS_INSTANCE(AddCompositeExtract);
   REPEATED_PASS_INSTANCE(AddCompositeInserts);
   REPEATED_PASS_INSTANCE(AddCompositeTypes);
   REPEATED_PASS_INSTANCE(AddCopyMemory);
@@ -131,20 +138,24 @@ class RepeatedPassInstances {
   REPEATED_PASS_INSTANCE(CopyObjects);
   REPEATED_PASS_INSTANCE(DonateModules);
   REPEATED_PASS_INSTANCE(DuplicateRegionsWithSelections);
+  REPEATED_PASS_INSTANCE(ExpandVectorReductions);
   REPEATED_PASS_INSTANCE(FlattenConditionalBranches);
   REPEATED_PASS_INSTANCE(InlineFunctions);
   REPEATED_PASS_INSTANCE(InvertComparisonOperators);
   REPEATED_PASS_INSTANCE(MakeVectorOperationsDynamic);
   REPEATED_PASS_INSTANCE(MergeBlocks);
+  REPEATED_PASS_INSTANCE(MergeFunctionReturns);
   REPEATED_PASS_INSTANCE(MutatePointers);
   REPEATED_PASS_INSTANCE(ObfuscateConstants);
   REPEATED_PASS_INSTANCE(OutlineFunctions);
   REPEATED_PASS_INSTANCE(PermuteBlocks);
   REPEATED_PASS_INSTANCE(PermuteFunctionParameters);
   REPEATED_PASS_INSTANCE(PermuteInstructions);
+  REPEATED_PASS_INSTANCE(PropagateInstructionsDown);
   REPEATED_PASS_INSTANCE(PropagateInstructionsUp);
   REPEATED_PASS_INSTANCE(PushIdsThroughVariables);
   REPEATED_PASS_INSTANCE(ReplaceAddsSubsMulsWithCarryingExtended);
+  REPEATED_PASS_INSTANCE(ReplaceBranchesFromDeadBlocksWithExits);
   REPEATED_PASS_INSTANCE(ReplaceCopyMemoriesWithLoadsStores);
   REPEATED_PASS_INSTANCE(ReplaceCopyObjectsWithStoresLoads);
   REPEATED_PASS_INSTANCE(ReplaceLoadsStoresWithCopyMemories);
@@ -156,6 +167,7 @@ class RepeatedPassInstances {
   REPEATED_PASS_INSTANCE(ReplaceParamsWithStruct);
   REPEATED_PASS_INSTANCE(SplitBlocks);
   REPEATED_PASS_INSTANCE(SwapBranchConditionalOperands);
+  REPEATED_PASS_INSTANCE(WrapRegionsInSelections);
 #undef REPEATED_PASS_INSTANCE
 
  public:
