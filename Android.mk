@@ -88,12 +88,14 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/composite.cpp \
 		source/opt/const_folding_rules.cpp \
 		source/opt/constants.cpp \
+		source/opt/control_dependence.cpp \
+		source/opt/convert_to_sampled_image_pass.cpp \
 		source/opt/convert_to_half_pass.cpp \
 		source/opt/copy_prop_arrays.cpp \
+		source/opt/dataflow.cpp \
 		source/opt/dead_branch_elim_pass.cpp \
 		source/opt/dead_insert_elim_pass.cpp \
 		source/opt/dead_variable_elimination.cpp \
-		source/opt/decompose_initialized_variables_pass.cpp \
 		source/opt/decoration_manager.cpp \
 		source/opt/debug_info_manager.cpp \
 		source/opt/def_use_manager.cpp \
@@ -112,7 +114,6 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/fold_spec_constant_op_and_composite_pass.cpp \
 		source/opt/freeze_spec_constant_value_pass.cpp \
 		source/opt/function.cpp \
-		source/opt/generate_webgpu_initializers_pass.cpp \
 		source/opt/graphics_robust_access_pass.cpp \
 		source/opt/if_conversion.cpp \
 		source/opt/inline_pass.cpp \
@@ -124,9 +125,9 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/instruction.cpp \
 		source/opt/instruction_list.cpp \
 		source/opt/instrument_pass.cpp \
+		source/opt/interp_fixup_pass.cpp \
 		source/opt/ir_context.cpp \
 		source/opt/ir_loader.cpp \
-                source/opt/legalize_vector_shuffle_pass.cpp \
 		source/opt/licm_pass.cpp \
 		source/opt/local_access_chain_convert_pass.cpp \
 		source/opt/local_redundancy_elimination.cpp \
@@ -155,16 +156,15 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/register_pressure.cpp \
 		source/opt/relax_float_ops_pass.cpp \
 		source/opt/remove_duplicates_pass.cpp \
+		source/opt/remove_unused_interface_variables_pass.cpp \
 		source/opt/replace_invalid_opc.cpp \
 		source/opt/scalar_analysis.cpp \
 		source/opt/scalar_analysis_simplification.cpp \
 		source/opt/scalar_replacement_pass.cpp \
 		source/opt/set_spec_constant_default_value_pass.cpp \
 		source/opt/simplification_pass.cpp \
-		source/opt/split_invalid_unreachable_pass.cpp \
 		source/opt/ssa_rewrite_pass.cpp \
 		source/opt/strength_reduction_pass.cpp \
-		source/opt/strip_atomic_counter_memory_pass.cpp \
 		source/opt/strip_debug_info_pass.cpp \
 		source/opt/strip_reflect_info_pass.cpp \
 		source/opt/struct_cfg_analysis.cpp \
@@ -184,6 +184,7 @@ SPV_GLSL_GRAMMAR=$(SPVHEADERS_LOCAL_PATH)/include/spirv/unified1/extinst.glsl.st
 SPV_OPENCL_GRAMMAR=$(SPVHEADERS_LOCAL_PATH)/include/spirv/unified1/extinst.opencl.std.100.grammar.json
 SPV_DEBUGINFO_GRAMMAR=$(SPVHEADERS_LOCAL_PATH)/include/spirv/unified1/extinst.debuginfo.grammar.json
 SPV_CLDEBUGINFO100_GRAMMAR=$(SPVHEADERS_LOCAL_PATH)/include/spirv/unified1/extinst.opencl.debuginfo.100.grammar.json
+SPV_VKDEBUGINFO100_GRAMMAR=$(LOCAL_PATH)/source/extinst.nonsemantic.vulkan.debuginfo.100.grammar.json
 
 define gen_spvtools_grammar_tables
 $(call generate-file-dir,$(1)/core.insts-unified1.inc)
@@ -215,6 +216,7 @@ $(LOCAL_PATH)/source/ext_inst.cpp: \
 	$(1)/opencl.std.insts.inc \
 	$(1)/debuginfo.insts.inc \
 	$(1)/opencl.debuginfo.100.insts.inc \
+	$(1)/nonsemantic.vulkan.debuginfo.100.insts.inc \
 	$(1)/spv-amd-gcn-shader.insts.inc \
 	$(1)/spv-amd-shader-ballot.insts.inc \
 	$(1)/spv-amd-shader-explicit-vertex-parameter.insts.inc \
@@ -244,6 +246,7 @@ endef
 # We generate language-specific headers for DebugInfo and OpenCL.DebugInfo.100
 $(eval $(call gen_spvtools_lang_headers,$(SPVTOOLS_OUT_PATH),DebugInfo,$(SPV_DEBUGINFO_GRAMMAR)))
 $(eval $(call gen_spvtools_lang_headers,$(SPVTOOLS_OUT_PATH),OpenCLDebugInfo100,$(SPV_CLDEBUGINFO100_GRAMMAR)))
+$(eval $(call gen_spvtools_lang_headers,$(SPVTOOLS_OUT_PATH),NonSemanticVulkanDebugInfo100,$(SPV_VKDEBUGINFO100_GRAMMAR)))
 
 
 define gen_spvtools_vendor_tables
@@ -258,9 +261,22 @@ $(1)/$(2).insts.inc : \
 		@echo "[$(TARGET_ARCH_ABI)] Vendor extended instruction set: $(2) tables <= grammar"
 $(LOCAL_PATH)/source/ext_inst.cpp: $(1)/$(2).insts.inc
 endef
+define gen_spvtools_vendor_tables_local
+$(call generate-file-dir,$(1)/$(2).insts.inc)
+$(1)/$(2).insts.inc : \
+        $(LOCAL_PATH)/utils/generate_grammar_tables.py \
+        $(LOCAL_PATH)/source/extinst.$(2).grammar.json
+		@$(HOST_PYTHON) $(LOCAL_PATH)/utils/generate_grammar_tables.py \
+		    --extinst-vendor-grammar=$(LOCAL_PATH)/source/extinst.$(2).grammar.json \
+		    --vendor-insts-output=$(1)/$(2).insts.inc \
+		    --vendor-operand-kind-prefix=$(3)
+		@echo "[$(TARGET_ARCH_ABI)] Vendor extended instruction set: $(2) tables <= grammar"
+$(LOCAL_PATH)/source/ext_inst.cpp: $(1)/$(2).insts.inc
+endef
 # Vendor and debug extended instruction sets, with grammars from SPIRV-Tools source tree.
 $(eval $(call gen_spvtools_vendor_tables,$(SPVTOOLS_OUT_PATH),debuginfo,""))
 $(eval $(call gen_spvtools_vendor_tables,$(SPVTOOLS_OUT_PATH),opencl.debuginfo.100,"CLDEBUG100_"))
+$(eval $(call gen_spvtools_vendor_tables_local,$(SPVTOOLS_OUT_PATH),nonsemantic.vulkan.debuginfo.100,"VKDEBUG100_"))
 $(eval $(call gen_spvtools_vendor_tables,$(SPVTOOLS_OUT_PATH),spv-amd-gcn-shader,""))
 $(eval $(call gen_spvtools_vendor_tables,$(SPVTOOLS_OUT_PATH),spv-amd-shader-ballot,""))
 $(eval $(call gen_spvtools_vendor_tables,$(SPVTOOLS_OUT_PATH),spv-amd-shader-explicit-vertex-parameter,""))

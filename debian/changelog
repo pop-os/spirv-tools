@@ -1,3 +1,14 @@
+spirv-tools (2021.2+git20210818-1) unstable; urgency=medium
+
+  [ Hill Ma ]
+  * control: Fix Vcs-Git and Vcs-Browser.
+
+  [ Timo Aaltonen ]
+  * New upstream snapshot.
+  * control: Bump spirv-headers dependency.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 18 Aug 2021 16:30:03 +0300
+
 spirv-tools (2020.6-2) unstable; urgency=medium
 
   * rules: Really build for the static library, and make sure shared one

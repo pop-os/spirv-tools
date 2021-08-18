@@ -5,11 +5,11 @@ Maintainer: Debian X Strike Force <debian-x@lists.debian.org>
 Build-Depends: debhelper-compat (= 12),
  cmake,
  python3-dev,
- spirv-headers (>= 1.5.4+rt~),
+ spirv-headers (>= 1.5.4+rt3-1~),
 Standards-Version: 4.5.0
 Homepage: https://github.com/KhronosGroup/SPIRV-Tools
-Vcs-Git: https://salsa.debian.org/git/xorg-team/vulkan/spirv-tools.git
-Vcs-Browser: https://salsa.debian.org/git/xorg-team/vulkan/spirv-tools.git
+Vcs-Git: https://salsa.debian.org/xorg-team/vulkan/spirv-tools.git
+Vcs-Browser: https://salsa.debian.org/xorg-team/vulkan/spirv-tools
 
 Package: spirv-tools
 Architecture: any

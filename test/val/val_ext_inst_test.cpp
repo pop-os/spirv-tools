@@ -3507,6 +3507,19 @@ TEST_P(ValidateGlslStd450SAbsLike, WrongBitWidthOperand) {
                         "Result Type"));
 }
 
+TEST_P(ValidateGlslStd450SAbsLike, TypelessOperand) {
+  const std::string ext_inst_name = GetParam();
+  const std::string body =
+      "%val1 = OpExtInst %s64 %extinst " + ext_inst_name + " %main_entry\n";
+
+  CompileSuccessfully(GenerateShaderCode(body));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("GLSL.std.450 " + ext_inst_name +
+                ": expected all operands to be int scalars or vectors"));
+}
+
 INSTANTIATE_TEST_SUITE_P(AllSAbsLike, ValidateGlslStd450SAbsLike,
                          ::testing::ValuesIn(std::vector<std::string>{
                              "SAbs",
@@ -3654,6 +3667,19 @@ TEST_P(ValidateGlslStd450UMinLike, WrongBitWidthOperand2) {
               HasSubstr("GLSL.std.450 " + ext_inst_name +
                         ": expected all operands to have the same bit width as "
                         "Result Type"));
+}
+
+TEST_P(ValidateGlslStd450UMinLike, TypelessOperand) {
+  const std::string ext_inst_name = GetParam();
+  const std::string body = "%val1 = OpExtInst %s64 %extinst " + ext_inst_name +
+                           " %s64_0 %main_entry\n";
+
+  CompileSuccessfully(GenerateShaderCode(body));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("GLSL.std.450 " + ext_inst_name +
+                ": expected all operands to be int scalars or vectors"));
 }
 
 INSTANTIATE_TEST_SUITE_P(AllUMinLike, ValidateGlslStd450UMinLike,
@@ -3817,6 +3843,19 @@ TEST_P(ValidateGlslStd450UClampLike, WrongBitWidthOperand3) {
               HasSubstr("GLSL.std.450 " + ext_inst_name +
                         ": expected all operands to have the same bit width as "
                         "Result Type"));
+}
+
+TEST_P(ValidateGlslStd450UClampLike, TypelessOperand) {
+  const std::string ext_inst_name = GetParam();
+  const std::string body = "%val1 = OpExtInst %s64 %extinst " + ext_inst_name +
+                           " %main_entry %s64_0 %s64_0\n";
+
+  CompileSuccessfully(GenerateShaderCode(body));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr("GLSL.std.450 " + ext_inst_name +
+                ": expected all operands to be int scalars or vectors"));
 }
 
 INSTANTIATE_TEST_SUITE_P(AllUClampLike, ValidateGlslStd450UClampLike,
@@ -5204,6 +5243,49 @@ TEST_F(ValidateExtInst, GlslStd450InterpolateAtCentroidSuccess) {
   ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
 }
 
+TEST_F(ValidateExtInst, GlslStd450InterpolateAtCentroidInternalSuccess) {
+  const std::string body = R"(
+%ld1  = OpLoad %f32 %f32_input
+%val1 = OpExtInst %f32 %extinst InterpolateAtCentroid %ld1
+%ld2  = OpLoad %f32vec2 %f32vec2_input
+%val2 = OpExtInst %f32vec2 %extinst InterpolateAtCentroid %ld2
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  getValidatorOptions()->before_hlsl_legalization = true;
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateExtInst, GlslStd450InterpolateAtCentroidInternalInvalidDataF32) {
+  const std::string body = R"(
+%ld1  = OpLoad %f32 %f32_input
+%val1 = OpExtInst %f32 %extinst InterpolateAtCentroid %ld1
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("GLSL.std.450 InterpolateAtCentroid: "
+                        "expected Interpolant to be a pointer"));
+}
+
+TEST_F(ValidateExtInst,
+       GlslStd450InterpolateAtCentroidInternalInvalidDataF32Vec2) {
+  const std::string body = R"(
+%ld2  = OpLoad %f32vec2 %f32vec2_input
+%val2 = OpExtInst %f32vec2 %extinst InterpolateAtCentroid %ld2
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("GLSL.std.450 InterpolateAtCentroid: "
+                        "expected Interpolant to be a pointer"));
+}
+
 TEST_F(ValidateExtInst, GlslStd450InterpolateAtCentroidNoCapability) {
   const std::string body = R"(
 %val1 = OpExtInst %f32 %extinst InterpolateAtCentroid %f32_input
@@ -5306,6 +5388,49 @@ TEST_F(ValidateExtInst, GlslStd450InterpolateAtSampleSuccess) {
   CompileSuccessfully(
       GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
   ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateExtInst, GlslStd450InterpolateAtSampleInternalSuccess) {
+  const std::string body = R"(
+%ld1  = OpLoad %f32 %f32_input
+%val1 = OpExtInst %f32 %extinst InterpolateAtSample %ld1 %u32_1
+%ld2  = OpLoad %f32vec2 %f32vec2_input
+%val2 = OpExtInst %f32vec2 %extinst InterpolateAtSample %ld2 %u32_1
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  getValidatorOptions()->before_hlsl_legalization = true;
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateExtInst, GlslStd450InterpolateAtSampleInternalInvalidDataF32) {
+  const std::string body = R"(
+%ld1  = OpLoad %f32 %f32_input
+%val1 = OpExtInst %f32 %extinst InterpolateAtSample %ld1 %u32_1
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("GLSL.std.450 InterpolateAtSample: "
+                        "expected Interpolant to be a pointer"));
+}
+
+TEST_F(ValidateExtInst,
+       GlslStd450InterpolateAtSampleInternalInvalidDataF32Vec2) {
+  const std::string body = R"(
+%ld2  = OpLoad %f32vec2 %f32vec2_input
+%val2 = OpExtInst %f32vec2 %extinst InterpolateAtSample %ld2 %u32_1
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("GLSL.std.450 InterpolateAtSample: "
+                        "expected Interpolant to be a pointer"));
 }
 
 TEST_F(ValidateExtInst, GlslStd450InterpolateAtSampleNoCapability) {
@@ -5436,6 +5561,48 @@ TEST_F(ValidateExtInst, GlslStd450InterpolateAtOffsetSuccess) {
   CompileSuccessfully(
       GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
   ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateExtInst, GlslStd450InterpolateAtOffsetInternalSuccess) {
+  const std::string body = R"(
+%ld1  = OpLoad %f32 %f32_input
+%val1 = OpExtInst %f32 %extinst InterpolateAtOffset %ld1 %f32vec2_01
+%ld2  = OpLoad %f32vec2 %f32vec2_input
+%val2 = OpExtInst %f32vec2 %extinst InterpolateAtOffset %ld2 %f32vec2_01
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  getValidatorOptions()->before_hlsl_legalization = true;
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateExtInst, GlslStd450InterpolateAtOffsetInternalInvalidDataF32) {
+  const std::string body = R"(
+%ld1  = OpLoad %f32 %f32_input
+%val1 = OpExtInst %f32 %extinst InterpolateAtOffset %ld1 %f32vec2_01
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("GLSL.std.450 InterpolateAtOffset: "
+                        "expected Interpolant to be a pointer"));
+}
+
+TEST_F(ValidateExtInst, GlslStd450InterpolateAtOffsetInternalInvalidDataF32Vec2) {
+  const std::string body = R"(
+%ld2  = OpLoad %f32vec2 %f32vec2_input
+%val2 = OpExtInst %f32vec2 %extinst InterpolateAtOffset %ld2 %f32vec2_01
+)";
+
+  CompileSuccessfully(
+      GenerateShaderCode(body, "OpCapability InterpolationFunction\n"));
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("GLSL.std.450 InterpolateAtOffset: "
+                        "expected Interpolant to be a pointer"));
 }
 
 TEST_F(ValidateExtInst, GlslStd450InterpolateAtOffsetNoCapability) {
