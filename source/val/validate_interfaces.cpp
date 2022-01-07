@@ -199,6 +199,10 @@ uint32_t NumConsumedComponents(ValidationState_t& _, const Instruction* type) {
           NumConsumedComponents(_, _.FindDef(type->GetOperandAs<uint32_t>(1)));
       num_components *= type->GetOperandAs<uint32_t>(2);
       break;
+    case SpvOpTypeArray:
+      // Skip the array.
+      return NumConsumedComponents(_,
+                                   _.FindDef(type->GetOperandAs<uint32_t>(1)));
     default:
       // This is an error that is validated elsewhere.
       break;
@@ -430,17 +434,36 @@ spv_result_t GetLocationsForVariable(
         continue;
       }
 
-      uint32_t end = (location + num_locations) * 4;
-      if (num_components != 0) {
-        start += component;
-        end = location * 4 + component + num_components;
-      }
-      for (uint32_t l = start; l < end; ++l) {
-        if (!locations->insert(l).second) {
-          return _.diag(SPV_ERROR_INVALID_DATA, entry_point)
-                 << "Entry-point has conflicting " << storage_class
-                 << " location assignment at location " << l / 4
-                 << ", component " << l % 4;
+      if (member->opcode() == SpvOpTypeArray && num_components >= 1 &&
+          num_components < 4) {
+        // When an array has an element that takes less than a location in
+        // size, calculate the used locations in a strided manner.
+        for (uint32_t l = location; l < num_locations + location; ++l) {
+          for (uint32_t c = component; c < component + num_components; ++c) {
+            uint32_t check = 4 * l + c;
+            if (!locations->insert(check).second) {
+              return _.diag(SPV_ERROR_INVALID_DATA, entry_point)
+                     << "Entry-point has conflicting " << storage_class
+                     << " location assignment at location " << l
+                     << ", component " << c;
+            }
+          }
+        }
+      } else {
+        // TODO: There is a hole here is the member is an array of 3- or
+        // 4-element vectors of 64-bit types.
+        uint32_t end = (location + num_locations) * 4;
+        if (num_components != 0) {
+          start += component;
+          end = location * 4 + component + num_components;
+        }
+        for (uint32_t l = start; l < end; ++l) {
+          if (!locations->insert(l).second) {
+            return _.diag(SPV_ERROR_INVALID_DATA, entry_point)
+                   << "Entry-point has conflicting " << storage_class
+                   << " location assignment at location " << l / 4
+                   << ", component " << l % 4;
+          }
         }
       }
     }
@@ -468,12 +491,18 @@ spv_result_t ValidateLocations(ValidationState_t& _,
   std::unordered_set<uint32_t> input_locations;
   std::unordered_set<uint32_t> output_locations_index0;
   std::unordered_set<uint32_t> output_locations_index1;
+  std::unordered_set<uint32_t> seen;
   for (uint32_t i = 3; i < entry_point->operands().size(); ++i) {
     auto interface_id = entry_point->GetOperandAs<uint32_t>(i);
     auto interface_var = _.FindDef(interface_id);
     auto storage_class = interface_var->GetOperandAs<SpvStorageClass>(2);
     if (storage_class != SpvStorageClassInput &&
         storage_class != SpvStorageClassOutput) {
+      continue;
+    }
+    if (!seen.insert(interface_id).second) {
+      // Pre-1.4 an interface variable could be listed multiple times in an
+      // entry point. Validation for 1.4 or later is done elsewhere.
       continue;
     }
 

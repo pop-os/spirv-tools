@@ -12,14 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
+#ifndef SOURCE_LINT_LINTS_H_
+#define SOURCE_LINT_LINTS_H_
+
+#include "source/opt/ir_context.h"
 
 namespace spvtools {
 namespace lint {
-namespace {
 
-TEST(PlaceholderTest, PlaceholderTest) { ASSERT_TRUE(true); }
+// All of the functions in this namespace output to the error consumer in the
+// |context| argument and return |true| if no errors are found. They do not
+// modify the IR.
+namespace lints {
 
-}  // namespace
+bool CheckDivergentDerivatives(opt::IRContext* context);
+
+}  // namespace lints
 }  // namespace lint
 }  // namespace spvtools
+
+#endif  // SOURCE_LINT_LINTS_H_
