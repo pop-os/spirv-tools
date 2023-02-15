@@ -1,0 +1,52 @@
+From 743578474de0736850286c2c6d2b796a923b1a7c Mon Sep 17 00:00:00 2001
+From: Dave Airlie <airlied@redhat.com>
+Date: Wed, 15 Feb 2023 16:50:24 +1000
+Subject: [PATCH] opt: fix spirv ABI on Linux again.
+
+Breaking the ABI for this API isn't worth it when the fix is so simple.
+---
+ include/spirv-tools/optimizer.hpp |  6 ++++--
+ source/opt/optimizer.cpp          | 10 ++++++++++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/include/spirv-tools/optimizer.hpp b/include/spirv-tools/optimizer.hpp
+index aa6a614e..8bdd4e82 100644
+--- a/include/spirv-tools/optimizer.hpp
++++ b/include/spirv-tools/optimizer.hpp
+@@ -525,8 +525,10 @@ Optimizer::PassToken CreateDeadInsertElimPass();
+ // If |remove_outputs| is true, allow outputs to be removed from the interface.
+ // This is only safe if the caller knows that there is no corresponding input
+ // variable in the following shader. It is false by default.
+-Optimizer::PassToken CreateAggressiveDCEPass(bool preserve_interface = false,
+-                                             bool remove_outputs = false);
++Optimizer::PassToken CreateAggressiveDCEPass();
++Optimizer::PassToken CreateAggressiveDCEPass(bool preserve_interface);
++Optimizer::PassToken CreateAggressiveDCEPass(bool preserve_interface,
++                                             bool remove_outputs);
+ 
+ // Creates a remove-unused-interface-variables pass.
+ // Removes variables referenced on the |OpEntryPoint| instruction that are not
+diff --git a/source/opt/optimizer.cpp b/source/opt/optimizer.cpp
+index cbc4b82f..46a92dd9 100644
+--- a/source/opt/optimizer.cpp
++++ b/source/opt/optimizer.cpp
+@@ -785,6 +785,16 @@ Optimizer::PassToken CreateLocalMultiStoreElimPass() {
+       MakeUnique<opt::SSARewritePass>());
+ }
+ 
++Optimizer::PassToken CreateAggressiveDCEPass() {
++  return MakeUnique<Optimizer::PassToken::Impl>(
++      MakeUnique<opt::AggressiveDCEPass>(false, false));
++}
++
++Optimizer::PassToken CreateAggressiveDCEPass(bool preserve_interface) {
++  return MakeUnique<Optimizer::PassToken::Impl>(
++      MakeUnique<opt::AggressiveDCEPass>(preserve_interface, false));
++}
++
+ Optimizer::PassToken CreateAggressiveDCEPass(bool preserve_interface,
+                                              bool remove_outputs) {
+   return MakeUnique<Optimizer::PassToken::Impl>(
+-- 
+2.39.1
+
