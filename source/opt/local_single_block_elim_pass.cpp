@@ -285,7 +285,9 @@ void LocalSingleBlockLoadStoreElimPass::InitExtensions() {
                                 "SPV_KHR_non_semantic_info",
                                 "SPV_KHR_uniform_group_instructions",
                                 "SPV_KHR_fragment_shader_barycentric",
-                                "SPV_KHR_vulkan_memory_model"});
+                                "SPV_KHR_vulkan_memory_model",
+                                "SPV_NV_bindless_texture",
+                                "SPV_EXT_shader_atomic_float_add"});
 }
 
 }  // namespace opt

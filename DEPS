@@ -3,18 +3,23 @@ use_relative_paths = True
 vars = {
   'github': 'https://github.com',
 
-  'effcee_revision': '66edefd2bb641de8a2f46b476de21f227fc03a28',
+  'abseil_revision': '79ca5d7aad63973c83a4962a66ab07cd623131ea',
 
-  'googletest_revision': 'bb2941fcc611b9e4eaf16f156e8c723348bf0931',
+  'effcee_revision': '19b4aa87af25cb4ee779a071409732f34bfc305c',
+
+  'googletest_revision': '6f6ab4212aa02cfe02e480711246da4fc17b0761',
 
   # Use protobufs before they gained the dependency on abseil
   'protobuf_revision': 'v21.12',
 
-  're2_revision': 'c9cba76063cf4235c1a15dd14a24a4ef8d623761',
-  'spirv_headers_revision': '268a061764ee69f09a477a695bf6a11ffe311b8d',
+  're2_revision': '960c861764ff54c9a12ff683ba55ccaad1a8f73b',
+  'spirv_headers_revision': '124a9665e464ef98b8b718d572d5f329311061eb',
 }
 
 deps = {
+  'external/abseil_cpp':
+      Var('github') + '/abseil/abseil-cpp.git@' + Var('abseil_revision'),
+
   'external/effcee':
       Var('github') + '/google/effcee.git@' + Var('effcee_revision'),
 
