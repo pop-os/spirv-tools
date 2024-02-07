@@ -1,3 +1,9 @@
+spirv-tools (2023.6~rc1-2) unstable; urgency=medium
+
+  * rules: Disable lto, since it breaks at least spirv-val.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 07 Feb 2024 19:19:14 +0200
+
 spirv-tools (2023.6~rc1-1) unstable; urgency=medium
 
   * New upstream release.
