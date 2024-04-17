@@ -1,3 +1,10 @@
+spirv-tools (2024.1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * control: Bump build-dep on spirv-headers.
+
+ -- Timo Aaltonen <tjaalton@debian.org>  Wed, 17 Apr 2024 18:46:52 +0300
+
 spirv-tools (2023.6~rc1-2) unstable; urgency=medium
 
   * rules: Disable lto, since it breaks at least spirv-val.
