@@ -1,1 +1,2 @@
 disable-shared-harder.diff
+#5534-spirv-link-allow-linking-functions-with-different-pointer-arguments.patch
