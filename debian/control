@@ -12,7 +12,7 @@ Vcs-Git: https://salsa.debian.org/xorg-team/vulkan/spirv-tools.git
 Vcs-Browser: https://salsa.debian.org/xorg-team/vulkan/spirv-tools
 
 Package: spirv-tools
-Architecture: any
+Architecture: amd64 arm64 i386
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: API and commands for processing SPIR-V modules
  The project includes an assembler, binary module parser, disassembler,
